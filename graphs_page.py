@@ -3122,18 +3122,17 @@ def confirm_button_fn(n_clicks):
     
     # Verificar condiciones para la generación del texto
     if (selection_criteria[0] != '') and (selection_criteria[-1][0] != ''):
-        probability_text = '(' + selection_criteria[-1] + ' | ' + selection_criteria[0]
+        probability_text = 'P(' + selection_criteria[-1] + ' | ' + selection_criteria[0]
         
         for i in range(1, 5):
             match selection_criteria[i][0]:
                 case 'seleccion':
                     list_operators = ['', '>', '>=', '<', '<=', '!=', '==']
-                    
                     if (selection_criteria[i][2] not in list_operators and 
-                        selection_criteria[i][2][0] not in list_operators):
-                        probability_text = probability_text + ', ' + selection_criteria[i][1] + ' = ' + selection_criteria[i][2]
+                        str(selection_criteria[i][2])[0] not in list_operators):
+                        probability_text = probability_text + ', ' + selection_criteria[i][1] + ' = ' + str(selection_criteria[i][2])
                     else:
-                        probability_text = probability_text + ', ' + selection_criteria[i][1] + ' ' + selection_criteria[i][2] + ' ' + selection_criteria[i][3]
+                        probability_text = probability_text + ', ' + selection_criteria[i][1] + ' ' + str(selection_criteria[i][2]) + ' ' + selection_criteria[i][3]
                 
                 case 'rango_num':
                     probability_text = probability_text + ', ' + selection_criteria[i][1] + ' ' + selection_criteria[i][2] + ' ' + str(selection_criteria[i][3])
@@ -3150,11 +3149,31 @@ def confirm_button_fn(n_clicks):
         graph_probabilty(selection_criteria, data_total, probability_text, count)
 
         # Estilo del gráfico
-        graph = html.Img(src="/outputs/probability_graph_"+str(count)+".png",style={
-                                'position': 'relative',
+        graph = (html.Img(src="/outputs/probability_graph_"+str(count)+".png",style={
+                                'position': 'absolute',
                                 'width': '100%',
                                 'borderRadius': '10px',
-                            })
+                            }),
+                dbc.Button(
+                        html.I(className="save-button"),  # Flecha hacia la izquierda
+                        id="save-button", color="primary", outline=True, style={
+                        'width': '5vh', 
+                        'position': 'absolute', 
+                        'height': '5vh', 
+                        'margin': '0 1% 0 0', 
+                        'right': '1%',
+                        'top': '2%',
+                        'backgroundImage': "url('/assets/images/download-svgrepo-com.svg')",
+                        'backgroundSize': 'cover',
+                        'backgroundPosition': 'center',
+                        'backgroundRepeat': 'no-repeat',
+                        'border': 'none',
+                        'backgroundColor': 'transparent',
+                        'cursor': 'pointer'}
+                        ),
+                dcc.Download(id="download-file")
+                )
+        
         
         if count > 0:
                
@@ -3166,6 +3185,15 @@ def confirm_button_fn(n_clicks):
 
     # Si no se cumplen las condiciones
     return dash.no_update, dash.no_update
+
+@app.callback(
+    Output("download-file", "data"),
+    Input("save-button", "n_clicks"),
+    prevent_initial_call=True
+)
+def download_file(n_clicks):
+    # Generar el archivo para descarga
+    return dcc.send_file("./outputs/probability_graph_"+str(count-1)+".png")
 
 @app.callback(
     Output('url-graphs', 'pathname'),

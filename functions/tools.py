@@ -452,8 +452,11 @@ def resolucion_40117(query: str, model:str, chat_id:str) -> str:
 @tool
 def normativa_apoyos(query: str, model:str, chat_id:str) -> str:
     """
-    Usar cuando se necesite responder preguntas acerca de la normativa técnica colombiana (NTC) para el diseño de 
-    estructuras de soporte (apoyos) y subestaciones tipo poste conforme al RETIE.
+    Utilizar cuando se necesite responder preguntas acerca de los requisitos técnicos, normativos y 
+    constructivos para el diseño, instalación y mantenimiento de apoyos y postes eléctricos en redes de
+    distribución y transmisión, con énfasis en materiales, resistencia mecánica, protección anticorrosiva, 
+    alturas, distancias de seguridad, y cumplimiento de normativas como el RETIE, NTC y ASTM, asegurando 
+    estabilidad estructural y seguridad en diversas condiciones ambientales y operativas.
     """
 
     # Abrir el archivo en modo de lectura
@@ -531,8 +534,13 @@ def normativa_apoyos(query: str, model:str, chat_id:str) -> str:
 @tool
 def normativa_protecciones(query: str, model:str, chat_id:str) -> str:
     """
-    Usar cuando se necesite responder preguntas acerca de la normativa técnica colombiana (NTC) de protecciones en redes eléctricas 
-    de nivel de tensión 2.
+    Utilizar cuando se necesite responder preguntas acerca de la selección, instalación y coordinación 
+    de protecciones eléctricas mediante fusibles y dispositivos de protección contra sobretensiones (DPS), 
+    considerando normativas específicas como la NTC 2797, NTC 2132, IEC 61643-1, UL 1449, y IEEE C62.41, 
+    aplicables a transformadores, alimentadores y ramales. También es útil para determinar capacidades de 
+    fusibles en sistemas de 13,2 kV y 34,5 kV, garantizar la protección contra sobrecorrientes y 
+    sobretensiones, y asegurar la conformidad con estándares técnicos en sistemas eléctricos de 
+    distribución.
     """
 
     # Abrir el archivo en modo de lectura
@@ -590,6 +598,420 @@ def normativa_protecciones(query: str, model:str, chat_id:str) -> str:
     embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
     # load from disk
     vectorstore = Chroma(persist_directory=f"embeddings_by_procces/normativa_protecciones",embedding_function=embeddings)
+
+    docs=vectorstore.similarity_search(query,k=5) #Retriever
+
+    print(docs)
+
+    response=chain({"input_documents": docs, "human_input": query, "chat_history":memory}, return_only_outputs=False)['output_text'] #AI answer
+
+    #Save the chat history (memory) for a new iteration of the conversation for the general agent:
+    with open(path_memory, 'wb') as f:
+        pickle.dump(chain.memory, f)
+
+
+    with open("answer.pkl", 'wb') as archivo:
+        pickle.dump(response, archivo)
+
+    return response
+
+
+@tool
+def normativa_aisladores(query: str, model:str, chat_id:str) -> str:
+    """
+    Utilizar cuando se necesite responder preguntas acerca de la selección, uso y mantenimiento de 
+    aisladores eléctricos en redes de distribución y transmisión, considerando normativas técnicas 
+    (RETIE, IEC), parámetros de diseño (tensión, contaminación, esfuerzos mecánicos), tipos de aisladores 
+    adecuados según el entorno, cálculos de distancia de fuga, y especificaciones técnicas para garantizar
+    confiabilidad y seguridad en condiciones operativas y ambientales adversas.
+    """
+
+    # Abrir el archivo en modo de lectura
+    with open(f"number_iteration.pkl", "r") as archivo:
+        # Leer el contenido del archivo
+        contenido = archivo.read()
+        # Convertir el contenido a un número entero
+        number_iteration = int(contenido)
+        
+    # Abrir el archivo en modo de escritura
+    with open(f"number_iteration.pkl", "w") as archivo:
+        # Escribir el número entero en el archivo
+        number_iteration=number_iteration+1
+        archivo.write(str(number_iteration))
+
+
+    #PROMP TEMPLATE:
+    template = """ Se te proporcionará una serie de textos que contienen instrucciones sobre cómo 
+                resolver preguntas acerca de normativas en redes eléctricas de nivel de tensión 2. 
+                Según estos textos, responde a la pregunta de la manera más completa posible.
+
+                Dado el siguiente contexto y teniendo en cuenta el historial de la conversación, 
+                responde a las preguntas hechas por el usuario:
+
+                {context}
+
+                {chat_history}
+                Human: {human_input}
+                Chatbot (RESPUESTA FORMAL):
+                """ 
+    prompt = PromptTemplate(
+        input_variables=["chat_history", "human_input", "context"], template=template
+    )
+
+    memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+
+    if model=="gpt":
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    elif model=="llama1":
+        llm_chat=ChatOllama(model="llama3.1",temperature=0)
+    elif model=="llama2":
+        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
+
+    
+    chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
+    
+    # Load the chat history of the conversation for every particular agent
+    path_memory=f"memories/{chat_id}.pkl"
+    if os.path.exists(path_memory):
+        with open(path_memory, 'rb') as f:
+            memory = pickle.load(f) #memory of the conversation
+        
+        chain.memory=memory
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
+    # load from disk
+    vectorstore = Chroma(persist_directory=f"embeddings_by_procces/normativa_aisladores",embedding_function=embeddings)
+
+    docs=vectorstore.similarity_search(query,k=5) #Retriever
+
+    print(docs)
+
+    response=chain({"input_documents": docs, "human_input": query, "chat_history":memory}, return_only_outputs=False)['output_text'] #AI answer
+
+    #Save the chat history (memory) for a new iteration of the conversation for the general agent:
+    with open(path_memory, 'wb') as f:
+        pickle.dump(chain.memory, f)
+
+
+    with open("answer.pkl", 'wb') as archivo:
+        pickle.dump(response, archivo)
+
+    return response
+
+@tool
+def redes_aereas_media_tension(query: str, model:str, chat_id:str) -> str:
+    """
+    Utilizar cuando se necesite responder preguntas acerca de el diseño, construcción y mantenimiento de 
+    redes aéreas de media tensión, abarcando criterios como tipos de líneas (33 kV y 13.2 kV), 
+    especificaciones de apoyos primarios, distancias mínimas de seguridad, selección de conductores, 
+    nivel de aislamiento, métodos de puesta a tierra, y normativas aplicables para garantizar la 
+    seguridad, confiabilidad y conformidad con estándares técnicos en zonas urbanas y rurales.
+    """
+
+    # Abrir el archivo en modo de lectura
+    with open(f"number_iteration.pkl", "r") as archivo:
+        # Leer el contenido del archivo
+        contenido = archivo.read()
+        # Convertir el contenido a un número entero
+        number_iteration = int(contenido)
+        
+    # Abrir el archivo en modo de escritura
+    with open(f"number_iteration.pkl", "w") as archivo:
+        # Escribir el número entero en el archivo
+        number_iteration=number_iteration+1
+        archivo.write(str(number_iteration))
+
+
+    #PROMP TEMPLATE:
+    template = """ Se te proporcionará una serie de textos que contienen instrucciones sobre cómo 
+                resolver preguntas acerca de normativas en redes eléctricas de nivel de tensión 2. 
+                Según estos textos, responde a la pregunta de la manera más completa posible.
+
+                Dado el siguiente contexto y teniendo en cuenta el historial de la conversación, 
+                responde a las preguntas hechas por el usuario:
+
+                {context}
+
+                {chat_history}
+                Human: {human_input}
+                Chatbot (RESPUESTA FORMAL):
+                """ 
+    prompt = PromptTemplate(
+        input_variables=["chat_history", "human_input", "context"], template=template
+    )
+
+    memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+
+    if model=="gpt":
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    elif model=="llama1":
+        llm_chat=ChatOllama(model="llama3.1",temperature=0)
+    elif model=="llama2":
+        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
+
+    
+    chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
+    
+    # Load the chat history of the conversation for every particular agent
+    path_memory=f"memories/{chat_id}.pkl"
+    if os.path.exists(path_memory):
+        with open(path_memory, 'rb') as f:
+            memory = pickle.load(f) #memory of the conversation
+        
+        chain.memory=memory
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
+    # load from disk
+    vectorstore = Chroma(persist_directory=f"embeddings_by_procces/redes_aereas_media_tension",embedding_function=embeddings)
+
+    docs=vectorstore.similarity_search(query,k=5) #Retriever
+
+    print(docs)
+
+    response=chain({"input_documents": docs, "human_input": query, "chat_history":memory}, return_only_outputs=False)['output_text'] #AI answer
+
+    #Save the chat history (memory) for a new iteration of the conversation for the general agent:
+    with open(path_memory, 'wb') as f:
+        pickle.dump(chain.memory, f)
+
+
+    with open("answer.pkl", 'wb') as archivo:
+        pickle.dump(response, archivo)
+
+    return response
+
+@tool
+def codigo_electrico_colombiano(query: str, model:str, chat_id:str) -> str:
+    """
+    Utilizar cuando se necesite responder preguntas acerca de los requisitos técnicos, 
+    normativos y de seguridad para instalaciones eléctricas en Colombia, incluyendo sistemas de 
+    alambrado, protección contra sobrecorriente, puesta a tierra, acometidas, métodos de instalación, 
+    selección de materiales, y cumplimiento del Código Eléctrico Colombiano (NTC 2050), aplicable a 
+    proyectos residenciales, comerciales e industriales.
+    """
+
+    # Abrir el archivo en modo de lectura
+    with open(f"number_iteration.pkl", "r") as archivo:
+        # Leer el contenido del archivo
+        contenido = archivo.read()
+        # Convertir el contenido a un número entero
+        number_iteration = int(contenido)
+        
+    # Abrir el archivo en modo de escritura
+    with open(f"number_iteration.pkl", "w") as archivo:
+        # Escribir el número entero en el archivo
+        number_iteration=number_iteration+1
+        archivo.write(str(number_iteration))
+
+
+    #PROMP TEMPLATE:
+    template = """ Se te proporcionará una serie de textos que contienen instrucciones sobre cómo 
+                resolver preguntas acerca de normativas en redes eléctricas de nivel de tensión 2. 
+                Según estos textos, responde a la pregunta de la manera más completa posible.
+
+                Dado el siguiente contexto y teniendo en cuenta el historial de la conversación, 
+                responde a las preguntas hechas por el usuario:
+
+                {context}
+
+                {chat_history}
+                Human: {human_input}
+                Chatbot (RESPUESTA FORMAL):
+                """ 
+    prompt = PromptTemplate(
+        input_variables=["chat_history", "human_input", "context"], template=template
+    )
+
+    memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+
+    if model=="gpt":
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    elif model=="llama1":
+        llm_chat=ChatOllama(model="llama3.1",temperature=0)
+    elif model=="llama2":
+        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
+
+    
+    chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
+    
+    # Load the chat history of the conversation for every particular agent
+    path_memory=f"memories/{chat_id}.pkl"
+    if os.path.exists(path_memory):
+        with open(path_memory, 'rb') as f:
+            memory = pickle.load(f) #memory of the conversation
+        
+        chain.memory=memory
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
+    # load from disk
+    vectorstore = Chroma(persist_directory=f"embeddings_by_procces/codigo_electrico_colombiano",embedding_function=embeddings)
+
+    docs=vectorstore.similarity_search(query,k=5) #Retriever
+
+    print(docs)
+
+    response=chain({"input_documents": docs, "human_input": query, "chat_history":memory}, return_only_outputs=False)['output_text'] #AI answer
+
+    #Save the chat history (memory) for a new iteration of the conversation for the general agent:
+    with open(path_memory, 'wb') as f:
+        pickle.dump(chain.memory, f)
+
+
+    with open("answer.pkl", 'wb') as archivo:
+        pickle.dump(response, archivo)
+
+    return response
+
+
+@tool
+def requisitos_redes_aereas(query: str, model:str, chat_id:str) -> str:
+    """
+    Utilizar cuando se necesite responder preguntas acerca de los requisitos técnicos y normativos 
+    para el diseño, construcción y mantenimiento de redes eléctricas aéreas en zonas especiales como 
+    áreas costeras, contaminadas o con alta densidad de descargas atmosféricas, incluyendo la selección 
+    de materiales (aisladores, postes, herrajes), métodos de construcción, 
+    parámetros de aislamiento (CFO), y estrategias para mejorar la confiabilidad frente a condiciones 
+    adversas, basándose en normativas como IEEE 1410, RETIE e IEC 60815.
+    """
+
+    # Abrir el archivo en modo de lectura
+    with open(f"number_iteration.pkl", "r") as archivo:
+        # Leer el contenido del archivo
+        contenido = archivo.read()
+        # Convertir el contenido a un número entero
+        number_iteration = int(contenido)
+        
+    # Abrir el archivo en modo de escritura
+    with open(f"number_iteration.pkl", "w") as archivo:
+        # Escribir el número entero en el archivo
+        number_iteration=number_iteration+1
+        archivo.write(str(number_iteration))
+
+
+    #PROMP TEMPLATE:
+    template = """ Se te proporcionará una serie de textos que contienen instrucciones sobre cómo 
+                resolver preguntas acerca de normativas en redes eléctricas de nivel de tensión 2. 
+                Según estos textos, responde a la pregunta de la manera más completa posible.
+
+                Dado el siguiente contexto y teniendo en cuenta el historial de la conversación, 
+                responde a las preguntas hechas por el usuario:
+
+                {context}
+
+                {chat_history}
+                Human: {human_input}
+                Chatbot (RESPUESTA FORMAL):
+                """ 
+    prompt = PromptTemplate(
+        input_variables=["chat_history", "human_input", "context"], template=template
+    )
+
+    memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+
+    if model=="gpt":
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    elif model=="llama1":
+        llm_chat=ChatOllama(model="llama3.1",temperature=0)
+    elif model=="llama2":
+        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
+
+    
+    chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
+    
+    # Load the chat history of the conversation for every particular agent
+    path_memory=f"memories/{chat_id}.pkl"
+    if os.path.exists(path_memory):
+        with open(path_memory, 'rb') as f:
+            memory = pickle.load(f) #memory of the conversation
+        
+        chain.memory=memory
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
+    # load from disk
+    vectorstore = Chroma(persist_directory=f"embeddings_by_procces/requisitos_redes_aereas",embedding_function=embeddings)
+
+    docs=vectorstore.similarity_search(query,k=5) #Retriever
+
+    print(docs)
+
+    response=chain({"input_documents": docs, "human_input": query, "chat_history":memory}, return_only_outputs=False)['output_text'] #AI answer
+
+    #Save the chat history (memory) for a new iteration of the conversation for the general agent:
+    with open(path_memory, 'wb') as f:
+        pickle.dump(chain.memory, f)
+
+
+    with open("answer.pkl", 'wb') as archivo:
+        pickle.dump(response, archivo)
+
+    return response
+
+@tool
+def retie(query: str, model:str, chat_id:str) -> str:
+    """
+    Utilizar cuando se necesite responder preguntas acerca de el diseño, instalación, operación, 
+    y mantenimiento de instalaciones eléctricas en Colombia, según los requisitos del Reglamento 
+    Técnico de Instalaciones Eléctricas (RETIE). Esto incluye temas como competencias de las personas 
+    involucradas, diseño eléctrico detallado y básico, sistemas de puesta a tierra, protección contra 
+    rayos, distancias de seguridad, clasificación de instalaciones, y cumplimiento de normativas de 
+    seguridad eléctrica y ambiental.
+    """
+
+    # Abrir el archivo en modo de lectura
+    with open(f"number_iteration.pkl", "r") as archivo:
+        # Leer el contenido del archivo
+        contenido = archivo.read()
+        # Convertir el contenido a un número entero
+        number_iteration = int(contenido)
+        
+    # Abrir el archivo en modo de escritura
+    with open(f"number_iteration.pkl", "w") as archivo:
+        # Escribir el número entero en el archivo
+        number_iteration=number_iteration+1
+        archivo.write(str(number_iteration))
+
+
+    #PROMP TEMPLATE:
+    template = """ Se te proporcionará una serie de textos que contienen instrucciones sobre cómo 
+                resolver preguntas acerca de normativas en redes eléctricas de nivel de tensión 2. 
+                Según estos textos, responde a la pregunta de la manera más completa posible.
+
+                Dado el siguiente contexto y teniendo en cuenta el historial de la conversación, 
+                responde a las preguntas hechas por el usuario:
+
+                {context}
+
+                {chat_history}
+                Human: {human_input}
+                Chatbot (RESPUESTA FORMAL):
+                """ 
+    prompt = PromptTemplate(
+        input_variables=["chat_history", "human_input", "context"], template=template
+    )
+
+    memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+
+    if model=="gpt":
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    elif model=="llama1":
+        llm_chat=ChatOllama(model="llama3.1",temperature=0)
+    elif model=="llama2":
+        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
+
+    
+    chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
+    
+    # Load the chat history of the conversation for every particular agent
+    path_memory=f"memories/{chat_id}.pkl"
+    if os.path.exists(path_memory):
+        with open(path_memory, 'rb') as f:
+            memory = pickle.load(f) #memory of the conversation
+        
+        chain.memory=memory
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
+    # load from disk
+    vectorstore = Chroma(persist_directory=f"embeddings_by_procces/retie",embedding_function=embeddings)
 
     docs=vectorstore.similarity_search(query,k=5) #Retriever
 

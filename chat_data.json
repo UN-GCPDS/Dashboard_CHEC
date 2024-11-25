@@ -426,7 +426,91 @@
                 }
             ],
             "files": []
+        },
+        "chat-19": {
+            "nombre": "chat-19",
+            "mensajes": [
+                {
+                    "autor": "Tú",
+                    "texto": "Qué me puedes decir del Código Eléctrico Colombiano",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "codigo_electrico_colombiano"
+                },
+                {
+                    "autor": "Asistente",
+                    "texto": "El Código Eléctrico Colombiano es un conjunto de normas y reglamentos que establecen los requisitos técnicos y de seguridad que deben cumplir las instalaciones eléctricas en Colombia. Estas normativas se aplican a nivel nacional y abarcan aspectos como la protección contra sobrecargas, cortocircuitos, la correcta instalación de equipos eléctricos, entre otros. Es importante cumplir con el Código Eléctrico Colombiano para garantizar la seguridad de las personas y la eficiencia de las redes eléctricas de nivel de tensión 2."
+                },
+                {
+                    "autor": "Tú",
+                    "texto": "Explícame de manera general la normativa de puesta a tierras",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "general"
+                },
+                {
+                    "autor": "Asistente",
+                    "texto": "La normativa de puesta a tierra establece los requisitos y procedimientos para garantizar una conexión segura y eficaz de los equipos eléctricos a tierra. Esto es fundamental para proteger a las personas y equipos contra descargas eléctricas, garantizar la continuidad del suministro eléctrico y prevenir daños en caso de fallas en el sistema. La normativa de puesta a tierra incluye aspectos como la resistencia de tierra, la ubicación de electrodos de puesta a tierra, la conexión de equipos metálicos a tierra, entre otros. Es importante cumplir con esta normativa para asegurar la seguridad y eficiencia de las instalaciones eléctricas."
+                },
+                {
+                    "autor": "Tú",
+                    "texto": "¿De qué artículo del RETIE sacaste esa información?",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "general"
+                },
+                {
+                    "autor": "Asistente",
+                    "texto": "¡Hola! Parece que estás preglando información específica sobre el artículo del RETIE del cual se obtuvo cierta información. Para proporcionarte una respuesta precisa, necesitaría saber más detalles sobre la información que estás buscando. ¿Podrías proporcionarme más contexto o detalles sobre el artículo en cuestión? ¡Estaré encantado de ayudarte!"
+                },
+                {
+                    "autor": "Tú",
+                    "texto": "¿Qué artículo del RETIE habla sobre la puesta a tierra?",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "general"
+                },
+                {
+                    "autor": "Asistente",
+                    "texto": "La puesta a tierra es un sistema fundamental en las instalaciones eléctricas, ya que permite disipar corrientes de falla, proteger a las personas y equipos contra descargas eléctricas, y garantizar la continuidad del suministro eléctrico. Según la normativa de puesta a tierra en el Código Eléctrico Colombiano, se deben cumplir ciertos requisitos como la conexión de elementos metálicos a tierra, la interconexión de todas las puestas a tierra en un edificio, la realización de mediciones para verificar la resistencia de puesta a tierra, y el mantenimiento periódico de los sistemas de puesta a tierra. Es importante seguir estas normas para asegurar la seguridad y eficiencia de las instalaciones eléctricas."
+                },
+                {
+                    "autor": "Tú",
+                    "texto": "¿Qué artículo del RETIE habla sobre la puesta a tierra?",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "retie"
+                },
+                {
+                    "autor": "Asistente",
+                    "texto": "El artículo 3.12 del RETIE habla sobre el Sistema de Puesta a Tierra (SPT) en las instalaciones eléctricas. Este artículo establece los requisitos generales del sistema de puesta a tierra, los objetivos y funciones del SPT, la importancia de garantizar la seguridad de las personas en contacto con la instalación eléctrica, y la necesidad de cumplir con los valores de resistencia de puesta a tierra establecidos en la normativa. Además, el artículo menciona la importancia de la baja resistencia de puesta a tierra para disminuir la máxima elevación de potencial y garantizar la seguridad de las personas en caso de una falla."
+                },
+                {
+                    "autor": "Tú",
+                    "texto": "¿Cuál es el valor máximo de resistencia de puesto a tierra para baja tensión?",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "retie"
+                },
+                {
+                    "autor": "Asistente",
+                    "texto": "Según el artículo 3.12.3 del RETIE, el valor máximo de resistencia de puesta a tierra para el punto neutro de acometida en baja tensión es de 25 Ω. Este valor se establece como referencia para garantizar el control de las tensiones de paso, contacto y transferidas, y para asegurar que las tensiones aplicadas al ser humano en caso de una falla a tierra no superen los umbrales de soportabilidad establecidos en la normativa. Es importante cumplir con este valor máximo de resistencia de puesta a tierra para garantizar la seguridad de las personas y la eficiencia de las instalaciones eléctricas en baja tensión."
+                },
+                {
+                    "autor": "Tú",
+                    "texto": "Genera una gráfica con el porcentaje de contribución al indicador SAIFI por municipio en el año 2019",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "general"
+                },
+                {
+                    "autor": "Asistente",
+                    "imagen": "plots/chat-19/output_0.jpg",
+                    "texto": "¿Hay algo más en lo que te pueda ayudar?"
+                }
+            ],
+            "files": []
         }
     },
-    "current_chat_id": "chat-18"
+    "current_chat_id": "chat-19"
 }

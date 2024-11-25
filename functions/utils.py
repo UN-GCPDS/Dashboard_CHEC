@@ -27,7 +27,7 @@ import time
 import shutil 
 
 from functions.procces import eventos_transformadores_procces,eventos_transformadores_plots_procces
-from functions.tools import capitulo_1, capitulo_2, capitulo_3, capitulo_4, resolucion_40117,eventos_transformadores, eventos_transformadores_plots, normativa_apoyos, normativa_protecciones
+from functions.tools import capitulo_1, capitulo_2, capitulo_3, capitulo_4, resolucion_40117,eventos_transformadores, eventos_transformadores_plots, normativa_apoyos, normativa_protecciones, normativa_aisladores, redes_aereas_media_tension, codigo_electrico_colombiano, requisitos_redes_aereas, retie
 
 
 def update_documents_procces(name_procces,path_uploaded_pdf):
@@ -175,7 +175,7 @@ def conversation(chat_id,query,model,procces):
             number_iteration = 0
             archivo.write(str(number_iteration))
         
-        tools=[capitulo_1,capitulo_2,capitulo_3,capitulo_4,resolucion_40117,normativa_apoyos,normativa_protecciones,eventos_transformadores,eventos_transformadores_plots]
+        tools=[capitulo_1,capitulo_2,capitulo_3,capitulo_4,resolucion_40117,normativa_apoyos,normativa_protecciones,normativa_aisladores, redes_aereas_media_tension, codigo_electrico_colombiano, requisitos_redes_aereas, retie,eventos_transformadores,eventos_transformadores_plots]
         # if model=="gpt":
         #     llm_agent=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
         # elif model=="llama3.1":

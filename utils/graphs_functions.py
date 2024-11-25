@@ -81,11 +81,27 @@ def graph_probabilty(criterias, data_total, probility_text, count):
 
                             None
 
+            # Crear el histograma modificado
             plt.figure(figsize=(10, 6))
-            sns.histplot(data_frame_select[criterias[-1]], kde=True, color='blue', bins=30)
-            plt.xlabel(str(criterias[-1]))
-            plt.ylabel('Frecuencia/Densidad')
-            plt.savefig("./outputs/probability_graph_"+str(count)+".png")
+
+            # Histograma con valores normalizados a probabilidades
+            sns.histplot(
+                data_frame_select[criterias[-1]], 
+                kde=True, 
+                color='blue', 
+                bins=30, 
+                stat="probability"  # Normalizar los valores a probabilidades
+            )
+
+            # Etiquetas de los ejes con tamaño aumentado
+            plt.xlabel(str(criterias[-1]), fontsize=14)
+            plt.ylabel('Probabilidad', fontsize=14)
+
+            # Habilitar grid
+            plt.grid(True, linestyle='--', alpha=0.7)
+
+            # Guardar la figura
+            plt.savefig(f"./outputs/probability_graph_{count}.png")
         
         case 'Eventos Tramo':
 
@@ -123,11 +139,27 @@ def graph_probabilty(criterias, data_total, probility_text, count):
                             None
 
 
+            # Crear el histograma modificado
             plt.figure(figsize=(10, 6))
-            sns.histplot(data_frame_select[criterias[-1]], kde=True, color='blue', bins=30)
-            plt.xlabel(str(criterias[-1]))
-            plt.ylabel('Frecuencia/Densidad')
-            plt.savefig("./outputs/probability_graph_"+str(count)+".png")
+
+            # Histograma con valores normalizados a probabilidades
+            sns.histplot(
+                data_frame_select[criterias[-1]], 
+                kde=True, 
+                color='blue', 
+                bins=30, 
+                stat="probability"  # Normalizar los valores a probabilidades
+            )
+
+            # Etiquetas de los ejes con tamaño aumentado
+            plt.xlabel(str(criterias[-1]), fontsize=14)
+            plt.ylabel('Probabilidad', fontsize=14)
+
+            # Habilitar grid
+            plt.grid(True, linestyle='--', alpha=0.7)
+
+            # Guardar la figura
+            plt.savefig(f"./outputs/probability_graph_{count}.png")
 
         case 'Eventos Transformador':
 
@@ -164,11 +196,27 @@ def graph_probabilty(criterias, data_total, probility_text, count):
 
                             None
 
+            # Crear el histograma modificado
             plt.figure(figsize=(10, 6))
-            sns.histplot(data_frame_select[criterias[-1]], kde=True, color='blue', bins=30)
-            plt.xlabel(str(criterias[-1]))
-            plt.ylabel('Frecuencia/Densidad')
-            plt.savefig("./outputs/probability_graph_"+str(count)+".png")
+
+            # Histograma con valores normalizados a probabilidades
+            sns.histplot(
+                data_frame_select[criterias[-1]], 
+                kde=True, 
+                color='blue', 
+                bins=30, 
+                stat="probability"  # Normalizar los valores a probabilidades
+            )
+
+            # Etiquetas de los ejes con tamaño aumentado
+            plt.xlabel(str(criterias[-1]), fontsize=14)
+            plt.ylabel('Probabilidad', fontsize=14)
+
+            # Habilitar grid
+            plt.grid(True, linestyle='--', alpha=0.7)
+
+            # Guardar la figura
+            plt.savefig(f"./outputs/probability_graph_{count}.png")
 
         case _:
 

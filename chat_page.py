@@ -74,9 +74,9 @@ ESTILOS = {
     },
     'mensaje_usuario': {
         'textAlign': 'right',
-        'color': '#00782B',
+        'color': '#FFFFFF',
         'padding': '10px',
-        'backgroundColor': '#E6F4EA',
+        'backgroundColor': '#067325',
         'borderRadius': '15px',
         'maxWidth': '70%',
         'alignSelf': 'flex-end',
@@ -84,9 +84,9 @@ ESTILOS = {
     },
     'mensaje_asistente': {
         'textAlign': 'left',
-        'color': '#80A022',
+        'color': '#FFFFFF',
         'padding': '10px',
-        'backgroundColor': '#F0F6E7',
+        'backgroundColor': '#139d22',
         'borderRadius': '15px',
         'maxWidth': '70%',
         'alignSelf': 'flex-start',
@@ -151,10 +151,15 @@ PROCESOS = [
     {"label": "Instalaciones Objeto RETIE", "value": "capitulo_3"},
     {"label": "Evaluacion de la Conformidad RETIE", "value": "capitulo_4"},
     {"label": "Resolución 40117", "value": "resolucion_40117"},
-    {"label": "Interrupciones", "value": "interrrupciones_transformadores"},
-    {"label": "Generar Gráficos", "value": "generate_plots"},
     {"label": "Normativa Apoyos", "value": "normativa_apoyos"},
     {"label": "Normativa Protecciones", "value": "normativa_protecciones"},
+    {"label": "Normativa Aisladores", "value": "normativa_aisladores"},
+    {"label": "Normativa Redes Aereas", "value": "redes_aereas_media_tension"},
+    {"label": "Código Eléctrico Colombiano", "value": "codigo_electrico_colombiano"},
+    {"label": "Requisitos Redes Aéreas", "value": "requisitos_redes_aereas"},
+    {"label": "RETIE", "value": "retie"},
+    {"label": "Interrupciones", "value": "interrrupciones_transformadores"},
+    {"label": "Generar Gráficos", "value": "generate_plots"},
 ]
 
 # Crear una lista sin "General" para la carga de archivos
@@ -247,6 +252,89 @@ def manejar_chat(n_clicks_nuevo, n_clicks_enviar, n_submit, n_clicks_chat, mensa
             pass  # Manejar IDs no JSON si es necesario
 
     return nueva_data, nuevo_valor_entrada
+
+@app.callback(
+    [Output('chats-history', 'style'),
+     Output('chat-window', 'style'),
+     Output('toggle-button', 'style'),
+     Output('toggle-state', 'data')],
+    [Input('toggle-button', 'n_clicks')],
+    [State('toggle-state', 'data')]
+)
+def toggle_divs(n_clicks, toggle_state):
+
+    chats_history_style = [{
+            'height': '99.9%',
+            'width': '25%',
+            'overflowY': 'auto',
+            'backgroundColor': '#F0F6E7',
+            'transition': 'height 0.5s ease'
+            },
+            {
+            'height': '99.9%',
+            'width': '0%',
+            'overflowY': 'auto',
+            'backgroundColor': '#F0F6E7',
+            'transition': 'height 0.5s ease'
+            }]
+    
+    chat_window_style = [{
+            'display': 'flex',
+            'flexDirection': 'row',
+            'width': '75%',
+            'height': '100%',
+            'backgroundColor': '#f0f6e7',
+            'transition': 'height 0.5s ease'
+            },
+            {
+            'display': 'flex',
+            'flexDirection': 'row',
+            'width': '100%',
+            'height': '100%',
+            'backgroundColor': '#f0f6e7',
+            'transition': 'height 0.5s ease'
+            }]
+    
+    toggle_button_style = [{
+            'width': '3vh',
+            'height': '12%',
+            'border': 'none',
+            'margin': '20vh 0 0 0',
+            'backgroundColor': '#f0f6e7',
+            'backgroundImage': "url('/assets/images/left-arrow-next-svgrepo-com.svg')",
+            'backgroundSize': '100%',
+            'backgroundPosition': 'center',
+            'backgroundRepeat': 'no-repeat',
+            'cursor': 'pointer',
+            'transition': 'height 0.5s ease'
+            },
+            {
+            'width': '3vh',
+            'height': '12%',
+            'border': 'none',
+            'margin': '20vh 0 0 0',
+            'backgroundColor': '#f0f6e7',
+            'backgroundImage': "url('/assets/images/left-arrow-next-svgrepo-com.svg')",
+            'backgroundSize': '100%',
+            'backgroundPosition': 'center',
+            'backgroundRepeat': 'no-repeat',
+            'cursor': 'pointer',
+            'transition': 'height 0.5s ease',
+            'transform': 'rotate(180deg)'
+            }]
+
+    if n_clicks is None:
+        raise dash.exceptions.PreventUpdate
+
+    # Alternar el estado actual
+    toggle_state = not toggle_state
+
+    # Estilos según el estado
+    chats_history = chats_history_style[0] if toggle_state else chats_history_style[1]
+    chat_window = chat_window_style[0] if toggle_state else chat_window_style[1]
+    toggle_button = toggle_button_style[0] if toggle_state else toggle_button_style[1]
+
+    return chats_history, chat_window, toggle_button, toggle_state
 
 
 # Callback para generar la respuesta del asistente

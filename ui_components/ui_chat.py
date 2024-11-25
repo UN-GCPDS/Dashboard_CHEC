@@ -16,10 +16,15 @@ def work_space():
         {"label": "Instalaciones Objeto RETIE", "value": "capitulo_3"},
         {"label": "Evaluacion de la Conformidad RETIE", "value": "capitulo_4"},
         {"label": "Resolución 40117", "value": "resolucion_40117"},
-        {"label": "Interrupciones", "value": "interrrupciones_transformadores"},
-        {"label": "Generar Gráficos", "value": "generate_plots"},
         {"label": "Normativa Apoyos", "value": "normativa_apoyos"},
         {"label": "Normativa Protecciones", "value": "normativa_protecciones"},
+        {"label": "Normativa Aisladores", "value": "normativa_aisladores"},
+        {"label": "Normativa Redes Aereas", "value": "redes_aereas_media_tension"},
+        {"label": "Código Eléctrico Colombiano", "value": "codigo_electrico_colombiano"},
+        {"label": "Requisitos Redes Aéreas", "value": "requisitos_redes_aereas"},
+        {"label": "RETIE", "value": "retie"},
+        {"label": "Interrupciones", "value": "interrrupciones_transformadores"},
+        {"label": "Generar Gráficos", "value": "generate_plots"},
     ]
 
     PROCESOS_UPLOAD = [proceso for proceso in PROCESOS if proceso["value"] != "general"]
@@ -27,7 +32,7 @@ def work_space():
     # Puede ser un solo elemento o una lista de elementos
     return [
 
-        dbc.Col(width=3, children=[
+        dbc.Col(id='chats-history', width=3, children=[
             dbc.Card(
                 dbc.CardBody([
                     html.H5(
@@ -37,13 +42,14 @@ def work_space():
                             'fontWeight': 'bold',
                             'textAlign': 'center',
                             'marginBottom': '10px',
-                            'fontSize': '1.1em'
+                            'fontSize': '1.1em',
+                            'fontFamily': "'DM Sans', sans-serif"
                         }
                     ),
                     html.Div([
                         html.Label(
                             "Selecciona el Documento a Actualizar:", 
-                            style={'color': '#00782B', 'fontWeight': 'bold'}
+                            style={'color': '#00782B', 'fontWeight': 'bold', 'fontFamily': "'DM Sans', sans-serif"}
                         ),
                         dcc.Dropdown(
                             id='upload-proceso-select',
@@ -55,16 +61,17 @@ def work_space():
                                 'borderColor': '#80A022',
                                 'backgroundColor': 'white',
                                 'color': '#00782B',
-                                'padding': '5px'
+                                'padding': '5px',
+                                'fontFamily': "'Poppins', sans-serif"
                             }
                         )
-                    ], style={'marginBottom': '10px'}),
+                    ], style={'margin': '3vh 0 3vh 0'}),
                     dcc.Upload(
                         id='upload-pdf',
                         children=html.Div([
                             'Sube el Documento',
-                            html.A('', style={'color': '#00782B'})
-                        ]),
+                            html.A('', style={'color': '#00782B',})
+                        ], style={'fontFamily': "'DM Sans', sans-serif"}),
                         style={
                             'width': '100%',
                             'height': '60px',
@@ -83,14 +90,13 @@ def work_space():
                 ]),
                 style={
                     'backgroundColor': '#F0F6E7',
-                    'border': '1px solid #00782B',
                     'padding': '15px',
-                    'marginBottom': '15px'
+                    'marginBottom': '-11px'
                 }
             ),
             html.H2(
                 "Historial de Chats", 
-                style={'color': '#00782B'}
+                style={'color': '#00782B', 'fontFamily': "'DM Sans', sans-serif", 'textAlign': 'center', 'margin': '0% 0% 0% 0%'}
             ),
             html.Hr(),
             dbc.Button(
@@ -109,98 +115,124 @@ def work_space():
                 children=[]
             )
         ], style={
-            'height': '100%',
-            'width': '30%',
+            'height': '99.9%',
+            'width': '25%',
             'overflowY': 'auto',
-            'backgroundColor': '#F0F6E7'
+            'backgroundColor': '#F0F6E7',
+            'transition': 'height 0.5s ease'
         }),
-
-        dbc.Col(width=9, children=[
-            html.Div(
-                id='ventana-chat', 
-                style={
-                    'height': '135%',
-                    'overflowY': 'scroll',
-                    'padding': '10px',
-                    'backgroundColor': 'white',
-                    'display': 'flex',
-                    'flex-direction': 'column',
-                }
-            ),
-
-            dbc.Row([
-                dbc.Col(width=3, children=[
-                    dcc.Dropdown(
-                        id='model-select',
-                        options=[
-                            {'label': 'GPT', 'value': 'gpt'},
-                            {'label': 'Llama 3.1', 'value': 'llama3.1'},
-                            {'label': 'Llama 3.2', 'value': 'llama3.2'}
-                        ],
-                        value='gpt',
-                        clearable=False,
-                        style={'borderRadius': '5px'}
-                    )
-                ], style={
-                    'marginBottom': '8px',
-                    'width': '20%',
-                    }),
-                dbc.Col(width=3, children=[
-                    dcc.Dropdown(
-                        id='proceso-select',
-                        options=PROCESOS,
-                        value='general',
-                        clearable=False,
-                        style={'borderRadius': '5px'}
-                    )
-                ], style={
-                    'margin': '0 0 8px 0',
-                    'width': '32%'
-                    })
-            ], style={
-                'display': 'flex',
-                'flexDirection': 'row',
-                'margin': '0 0 0 2%',
-            }),
-
-            dbc.InputGroup([
-                dbc.Input(
-                    id='entrada-usuario',
-                    placeholder='Escribe tu pregunta...',
-                    type='text',
-                    style={
-                        'borderColor': '#80A022',
-                        'width': '87%',
-                        'height': '70%',
-                        'border-radius': '10px',
-                        'margin': '0 0 0 2%'
-                        }
-                ),
-                dbc.Button(
-                    "Enviar",
-                    id='enviar-btn',
-                    n_clicks=0,
-                    style={
-                        'backgroundColor': '#80A022',
-                        'color': 'white',
-                        'borderRadius': '10px',
-                        'width': 'auto',
-                        'height': '42%',
-                        'margin': '0 0 0 2%',
-                    }
-                )
-                ], style={
-                'width': '100%', 
-                'height': '23%'})
-        ], style={
-            'backgroundColor': 'white',
+            
+        html.Div(id='chat-window',style={
             'display': 'flex',
-            'flex-direction': 'column',
-            'width': '70%',
+            'flexDirection': 'row',
+            'width': '75%',
             'height': '100%',
-            'overflow': 'visible'
-        }),
-        dcc.Store(id='chat-data', data=load_previous_conversations())
+            'backgroundColor': '#f0f6e7',
+            'transition': 'height 0.5s ease'
+        },children=[
+            html.Button(id='toggle-button',className='Chat-Button',style={
+                    'width': '3vh',
+                    'height': '12%',
+                    'border': 'none',
+                    'margin': '20vh 0 0 0',
+                    'backgroundColor': '#f0f6e7',
+                    'backgroundImage': "url('/assets/images/left-arrow-next-svgrepo-com.svg')",
+                    'backgroundSize': '100%',
+                    'backgroundPosition': 'center',
+                    'backgroundRepeat': 'no-repeat',
+                    'cursor': 'pointer',
+                    'transition': 'height 0.5s ease'
+                }),
+            dcc.Store(id='toggle-state', data=False),  # False -> Div colapsado, True -> Div expandido
+            dbc.Col(width=9, children=[
+                
+                html.Div(
+                    id='ventana-chat', 
+                    style={
+                        'height': '82%',
+                        'overflowY': 'scroll',
+                        'padding': '10px',
+                        'backgroundColor': '#f0f6e7',
+                        'display': 'flex',
+                        'flex-direction': 'column',
+                    }
+                ),
+
+                dbc.Row([
+                    dbc.Col(width=3, children=[
+                        dcc.Dropdown(
+                            id='model-select',
+                            options=[
+                                {'label': 'GPT', 'value': 'gpt'},
+                                {'label': 'Llama 3.1', 'value': 'llama3.1'},
+                                {'label': 'Llama 3.2', 'value': 'llama3.2'}
+                            ],
+                            value='gpt',
+                            clearable=False,
+                            style={'borderRadius': '5px'}
+                        )
+                    ], style={
+                        'marginBottom': '8px',
+                        'width': '20%',
+                        }),
+                    dbc.Col(width=3, children=[
+                        dcc.Dropdown(
+                            id='proceso-select',
+                            options=PROCESOS,
+                            value='general',
+                            clearable=False,
+                            style={'borderRadius': '5px'}
+                        )
+                    ], style={
+                        'margin': '0 0 8px 0',
+                        'width': '32%'
+                        })
+                ], style={
+                    'display': 'flex',
+                    'flexDirection': 'row',
+                    'margin': '2vh 0 0 2%',
+                }),
+
+                dbc.InputGroup([
+                    dbc.Input(
+                        id='entrada-usuario',
+                        placeholder='Escribe tu pregunta...',
+                        type='text',
+                        style={
+                            'borderColor': '#80A022',
+                            'width': '87%',
+                            'height': '70%',
+                            'border-radius': '10px',
+                            'margin': '0 0 0 2%'
+                            }
+                    ),
+                    dbc.Button(
+                        "Enviar",
+                        id='enviar-btn',
+                        n_clicks=0,
+                        style={
+                            'backgroundColor': '#80A022',
+                            'color': 'white',
+                            'borderRadius': '10px',
+                            'width': 'auto',
+                            'height': '42%',
+                            'margin': '0 0 0 2%',
+                        }
+                    )
+                    ], style={
+                    'width': '100%', 
+                    'height': '16%'})
+                ], style={
+                'backgroundColor': '#f0f6e7',
+                'display': 'flex',
+                'flex-direction': 'column',
+                'width': '97%',
+                'height': '99.9%',
+                'overflow': 'visible'
+            }),
+            dcc.Store(id='chat-data', data=load_previous_conversations())
+        ])
+            
 ]
 
 # Función para crear el layout
