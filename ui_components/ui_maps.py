@@ -67,7 +67,7 @@ def work_space():
                         'display': 'flex',
                         'align-items': 'center'
                     }),
-                    html.Div('TIPO CON AMBIENTAL', className="text-cond-env", style={
+                    html.Div('TIPO CONDICIÓN', className="text-cond-env", style={
                         'fontFamily': "'DM Sans', sans-serif",
                         'fontSize': '16px',
                         'fontWeight': '700',

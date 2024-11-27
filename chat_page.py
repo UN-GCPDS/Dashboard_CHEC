@@ -80,7 +80,8 @@ ESTILOS = {
         'borderRadius': '15px',
         'maxWidth': '70%',
         'alignSelf': 'flex-end',
-        'margin': '5px'
+        'margin': '5px',
+        'fontSize': '19px',
     },
     'mensaje_asistente': {
         'textAlign': 'left',
@@ -90,7 +91,8 @@ ESTILOS = {
         'borderRadius': '15px',
         'maxWidth': '70%',
         'alignSelf': 'flex-start',
-        'margin': '5px'
+        'margin': '5px',
+        'fontSize': '19px',
     },
     'logo_chec': {
         'width': '200px',          # Aumenta el ancho a 200 píxeles

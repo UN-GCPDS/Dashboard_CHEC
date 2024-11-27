@@ -80,11 +80,11 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
         click_count = n_clicks
         data_frame = select_data(
             int(selected_date[:4]), int(selected_date[5:7]), selected_municipios,
-            total_data[0], total_data[1], total_data[2], total_data[3], total_data[4], total_data[5], total_data[6], total_data[7], total_data[8]
+            total_data[0], total_data[1], total_data[2], total_data[3], total_data[4], total_data[5], total_data[6]
         )
         folium_map = map_folium(
             data_frame[0], data_frame[1], data_frame[2], data_frame[3],
-            data_frame[4][0], data_frame[5][0], data_frame[6][0], data_frame[7][0], data_frame[8][0],condition
+            data_frame[4][0], data_frame[5][0], data_frame[6][0],condition
         )
 
         # Create the map and slider
@@ -182,7 +182,7 @@ def update_slider_and_map(decrease_clicks, increase_clicks, slider_value, slider
         print(f'Value:{day}')
         folium_map = map_folium(
             data_frame[0], data_frame[1], data_frame[2], data_frame[3],
-            data_frame[4][day-1], data_frame[5][day-1], data_frame[6][day-1], data_frame[7][day-1], data_frame[8][day-1], condition
+            data_frame[4][day-1], data_frame[5][day-1], data_frame[6][day-1], condition
         )
         # Devuelve el nuevo valor del slider y el HTML del mapa
         return slider_value, folium_map

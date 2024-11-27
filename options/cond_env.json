@@ -10,5 +10,9 @@
     {
         "label": "VEGETACION",
         "value": "VEGETACION"
+    },
+    {
+        "label": "CRITICIDAD",
+        "value": "CRITICIDAD"
     }    
 ]

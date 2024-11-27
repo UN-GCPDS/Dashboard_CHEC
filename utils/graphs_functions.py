@@ -21,7 +21,7 @@ def load_data():
 
     return eventos_interruptor, eventos_tramo_linea, eventos_transformador
 
-def graph_probabilty(criterias, data_total, probility_text, count):
+def graph_probabilty(criterias, data_total, probability_text, count):
 
     if count == 0:
 
@@ -94,7 +94,9 @@ def graph_probabilty(criterias, data_total, probility_text, count):
             )
 
             # Etiquetas de los ejes con tamaño aumentado
+            plt.title(probability_text, fontsize=10)
             plt.xlabel(str(criterias[-1]), fontsize=14)
+            #plt.xticks(rotation=90)
             plt.ylabel('Probabilidad', fontsize=14)
 
             # Habilitar grid
@@ -152,7 +154,9 @@ def graph_probabilty(criterias, data_total, probility_text, count):
             )
 
             # Etiquetas de los ejes con tamaño aumentado
+            plt.title(probability_text, fontsize=10)
             plt.xlabel(str(criterias[-1]), fontsize=14)
+            #plt.xticks(rotation=90)
             plt.ylabel('Probabilidad', fontsize=14)
 
             # Habilitar grid
@@ -209,7 +213,9 @@ def graph_probabilty(criterias, data_total, probility_text, count):
             )
 
             # Etiquetas de los ejes con tamaño aumentado
+            plt.title(probability_text, fontsize=10)
             plt.xlabel(str(criterias[-1]), fontsize=14)
+            #plt.xticks(rotation=90)
             plt.ylabel('Probabilidad', fontsize=14)
 
             # Habilitar grid

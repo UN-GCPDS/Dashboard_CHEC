@@ -1172,6 +1172,8 @@ def eventos_transformadores_plots(query: str, model:str, chat_id:str) -> str:
     Guarda la imagen en la ruta relativa {path_plot}.
     No ejecutes el comando plt.show().
     Siempre ejecuta el comando plt.tight_layout().
+    Siempre poner los ejes del gráfico con un fontsize = 14.
+    Siempre rotar las etiquetas del eje x a 90 grados.
     """
     # Al final, redacta conclusiones basadas **únicamente en los datos proporcionados en el DataFrame**.
     # Asegúrate de que todas las estadísticas y observaciones estén directamente derivadas de los datos.
