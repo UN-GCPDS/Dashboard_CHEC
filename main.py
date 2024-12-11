@@ -40,9 +40,10 @@ def display_page(pathname):
         return maps_page.layout
 
 if __name__ == '__main__':
-    # Abrir el archivo en modo lectura
+# Abrir el archivo en modo lectura
+
     with open("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/OPENAI_API_Key.txt", "r") as archivo:
         OPENAI_API_KEY = archivo.read()
 
-    os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
+    os.environ['OPENAI_API_KEY'] = "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"
     app.run_server(debug=True)

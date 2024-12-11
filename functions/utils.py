@@ -26,6 +26,8 @@ from langchain_openai import OpenAI
 import time
 import shutil 
 
+import maps_page
+
 from functions.procces import eventos_transformadores_procces,eventos_transformadores_plots_procces
 from functions.tools import capitulo_1, capitulo_2, capitulo_3, capitulo_4, resolucion_40117,eventos_transformadores, eventos_transformadores_plots, normativa_apoyos, normativa_protecciones, normativa_aisladores, redes_aereas_media_tension, codigo_electrico_colombiano, requisitos_redes_aereas, retie
 
@@ -168,6 +170,36 @@ def conversation(chat_id,query,model,procces):
 
             return response, False
 
+    elif procces == 'recomendacion':
+
+        # Cargar la variable desde el archivo JSON 
+        with open('./body_recommendations/'+str(chat_id)+'.json', 'r') as json_file: 
+            data_equipo = json.load(json_file)
+
+        if model=="llama3.2":
+            model="llama2"
+        elif model=="llama3.1":
+            model="llama1"
+
+        
+        if data_equipo['Equipo'] == 'Apoyo':
+
+            response = recomendacion_apoyos(model, chat_id, data_equipo, query)
+
+        elif data_equipo['Equipo'] == 'Transformador':
+
+            response = recomendacion_transformadores(model, chat_id, data_equipo, query)
+
+        elif data_equipo['Equipo'] == 'Switches':
+
+            response = recomendacion_switches(model, chat_id, data_equipo, query)
+
+        elif data_equipo['Equipo'] == 'Tramo de red':
+
+            response = recomendacion_tramo_red(model, chat_id, data_equipo, query)
+            
+        return response, False
+
     else:
         # Abrir el archivo en modo de escritura
         with open(f"number_iteration.pkl", "w") as archivo:
@@ -238,5 +270,509 @@ def conversation(chat_id,query,model,procces):
         
         
         return response, flag_image
+
+
+def recomendacion_apoyos(model:str, chat_id:str,data_equipo:dict,human_input='Genérame la recomendación') -> str:
+
+    instruction="Basándote en el contexto normativo, los valores proporcionados y la sugerencia, por favor proporciona una recomendación detallada y justificada sobre la variable"
+    variable_recomendacion=data_equipo["Variable_Recomendacion"]
+    variables_recomendacion_apoyos=pd.read_excel("c:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_apoyos.xlsx")
+    sugerencia=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Sugerencia"].iloc[0]
+    seccion_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Seccion_apoyos"].iloc[0]
+    valores_variable=json.dumps(data_equipo["Variable_Valores"])
+
+    template = """
+    Contexto Normativo y Situación:
+    {context}
+
+    Historial de Conversación:
+    {chat_history}
+
+    Datos del Apoyo/Poste:
+    {valores_variables}
+
+    Situación Reportada:
+    En el apoyo/poste especificado, se produjo una interrupción que afectó la continuidad del servicio eléctrico. 
+    Es fundamental garantizar que esta situación no se repita en el futuro. Las recomendaciones deben considerar 
+    tanto el cumplimiento normativo como la prevención de interrupciones similares.
+
+    Variable para la Recomendación:
+    {variable_recomendacion}
+
+    Sugerencia para la Recomendación:
+    {sugerencia}
+
+    Pregunta Actual del Usuario:
+    {human_input}
+
+    Tarea:
+    1. Analiza el contexto normativo y determina los requisitos específicos que afectan a la variable "{variable_recomendacion}".
+    2. Evalúa los valores proporcionados en "Datos del Apoyo/Poste" en relación con la interrupción reportada y 
+       determina si cumplen con las normativas y buenas prácticas para prevenir interrupciones.
+    3. Proporciona ejemplos concretos, indicando:
+        - Valores óptimos según las normativas para la variable "{variable_recomendacion}".
+        - Ejemplos de valores que podrían generar riesgo de interrupciones futuras.
+        - Alternativas o modificaciones recomendadas para evitar interrupciones similares.
+    4. Responde a la pregunta del usuario ({human_input}) considerando la información disponible.
+    5. Explica claramente la lógica detrás de la recomendación, utilizando fragmentos del contexto normativo para respaldarla.
+    6. Si es necesario, incluye acciones de mantenimiento, refuerzo estructural u otras estrategias para mitigar riesgos.
+
+    Resultado esperado:
+    Una recomendación detallada y justificada sobre la variable "{variable_recomendacion}", enfocada en prevenir interrupciones futuras, 
+    con ejemplos específicos, sugerencias prácticas, y una respuesta clara a la pregunta planteada por el usuario.
+    """
+
+
+    prompt = PromptTemplate(
+        input_variables=["context", "chat_history", "valores_variables","variables_recomendacion","sugerencia"], template=template
+    )
+
+
+    memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+
+    if model=="gpt":
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    elif model=="llama1":
+        llm_chat=ChatOllama(model="llama3.1",temperature=0)
+    elif model=="llama2":
+        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
+
+    
+    chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
+    
+    # Load the chat history of the conversation for every particular agent
+    path_memory=f"memories/{chat_id}.pkl"
+    if os.path.exists(path_memory):
+        with open(path_memory, 'rb') as f:
+            memory = pickle.load(f) #memory of the conversation
+        
+        chain.memory=memory
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
+    # load from disk
+    vectorstore = Chroma(persist_directory=f"./embeddings_by_procces/normativa_apoyos",embedding_function=embeddings)
+    
+    if human_input == 'Génerame la recomendación':
+        query = sugerencia + " " + seccion_buscar
+    else: 
+        query = human_input
+
+    docs=vectorstore.similarity_search(query,k=5) #Retriever
+    print(docs)
+
+    response=chain({"input_documents": docs, "human_input": human_input, "chat_history":memory,
+                    "valores_variables":valores_variable,"variable_recomendacion":variable_recomendacion,
+                    "sugerencia":sugerencia},
+                    return_only_outputs=False)['output_text'] #AI answer
+
+    
+    #Save the chat history (memory) for a new iteration of the conversation for the general agent:
+    with open(path_memory, 'wb') as f:
+        pickle.dump(chain.memory, f)
+
+
+    with open("answer.pkl", 'wb') as archivo:
+        pickle.dump(response, archivo)
+
+    return response
+
+def recomendacion_switches(model:str, chat_id:str,data_equipo:dict,human_input='Genérame la recomendación') -> str:
+
+    instruction="Basándote en el contexto normativo, los valores proporcionados y la sugerencia, por favor proporciona una recomendación detallada y justificada sobre la variable"
+    variable_recomendacion=data_equipo["Variable_Recomendacion"]
+    variables_recomendacion_apoyos=pd.read_excel("c:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_switches.xlsx")
+    sugerencia=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Sugerencia"].iloc[0]
+    seccion_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Seccion_switches"].iloc[0]
+    valores_variable=json.dumps(data_equipo["Variable_Valores"])
+
+    template = """
+    Contexto Normativo y Situación:
+    {context}
+
+    Historial de Conversación:
+    {chat_history}
+
+    Datos del Switche:
+    {valores_variables}
+
+    Situación Reportada:
+    En el switche especìficao especificado, se produjo una interrupción que afectó la continuidad del servicio eléctrico. 
+    Es fundamental garantizar que esta situación no se repita en el futuro. Las recomendaciones deben considerar 
+    tanto el cumplimiento normativo como la prevención de interrupciones similares.
+
+    Variable para la Recomendación:
+    {variable_recomendacion}
+
+    Sugerencia para la Recomendación:
+    {sugerencia}
+
+    Pregunta Actual del Usuario:
+    {human_input}
+
+    Tarea:
+    1. Analiza el contexto normativo y determina los requisitos específicos que afectan a la variable "{variable_recomendacion}".
+    2. Evalúa los valores proporcionados en "Datos del Switche" en relación con la interrupción reportada y 
+       determina si cumplen con las normativas y buenas prácticas para prevenir interrupciones.
+    3. Proporciona ejemplos concretos, indicando:
+        - Valores óptimos según las normativas para la variable "{variable_recomendacion}".
+        - Ejemplos de valores que podrían generar riesgo de interrupciones futuras.
+        - Alternativas o modificaciones recomendadas para evitar interrupciones similares.
+    4. Responde a la pregunta del usuario ({human_input}) considerando la información disponible.
+    5. Explica claramente la lógica detrás de la recomendación, utilizando fragmentos del contexto normativo para respaldarla.
+    6. Si es necesario, incluye acciones de mantenimiento, refuerzo estructural u otras estrategias para mitigar riesgos.
+
+    Resultado esperado:
+    Una recomendación detallada y justificada sobre la variable "{variable_recomendacion}", enfocada en prevenir interrupciones futuras, 
+    con ejemplos específicos, sugerencias prácticas, y una respuesta clara a la pregunta planteada por el usuario.
+    """
+
+
+    prompt = PromptTemplate(
+        input_variables=["context", "chat_history", "valores_variables","variables_recomendacion","sugerencia"], template=template
+    )
+
+
+    memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+
+    if model=="gpt":
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    elif model=="llama1":
+        llm_chat=ChatOllama(model="llama3.1",temperature=0)
+    elif model=="llama2":
+        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
+
+    
+    chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
+    
+    # Load the chat history of the conversation for every particular agent
+    path_memory=f"memories/{chat_id}.pkl"
+    if os.path.exists(path_memory):
+        with open(path_memory, 'rb') as f:
+            memory = pickle.load(f) #memory of the conversation
+        
+        chain.memory=memory
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
+    # load from disk
+    vectorstore = Chroma(persist_directory=f"./embeddings_by_procces/normativa_switches",embedding_function=embeddings)
+    
+    if human_input == 'Génerame la recomendación':
+        query =sugerencia+" "+seccion_buscar
+    else: 
+        query = human_input
+
+    docs=vectorstore.similarity_search(query,k=5) #Retriever
+    print(docs)
+
+    response=chain({"input_documents": docs, "human_input": human_input, "chat_history":memory,
+                    "valores_variables":valores_variable,"variable_recomendacion":variable_recomendacion,
+                    "sugerencia":sugerencia},
+                    return_only_outputs=False)['output_text'] #AI answer
+
+    
+    #Save the chat history (memory) for a new iteration of the conversation for the general agent:
+    with open(path_memory, 'wb') as f:
+        pickle.dump(chain.memory, f)
+
+
+    with open("answer.pkl", 'wb') as archivo:
+        pickle.dump(response, archivo)
+
+    return response
+
+def recomendacion_tramo_red(model:str, chat_id:str,data_equipo:dict,human_input='Genérame la recomendación') -> str:
+
+    instruction="Basándote en el contexto normativo, los valores proporcionados y la sugerencia, por favor proporciona una recomendación detallada y justificada sobre la variable"
+    variable_recomendacion=data_equipo["Variable_Recomendacion"]
+    variables_recomendacion_apoyos=pd.read_excel("c:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_tramo_red.xlsx")
+    sugerencia=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Sugerencia"].iloc[0]
+    seccion_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Seccion_tramo_red"].iloc[0]
+    valores_variable=json.dumps(data_equipo["Variable_Valores"])
+
+    template = """
+    Contexto Normativo y Situación:
+    {context}
+
+    Historial de Conversación:
+    {chat_history}
+
+    Datos del Tramo de Red:
+    {valores_variables}
+
+    Situación Reportada:
+    En el tramo de red especìficao especificado, se produjo una interrupción que afectó la continuidad del servicio eléctrico. 
+    Es fundamental garantizar que esta situación no se repita en el futuro. Las recomendaciones deben considerar 
+    tanto el cumplimiento normativo como la prevención de interrupciones similares.
+
+    Variable para la Recomendación:
+    {variable_recomendacion}
+
+    Sugerencia para la Recomendación:
+    {sugerencia}
+
+    Pregunta Actual del Usuario:
+    {human_input}
+
+    Tarea:
+    1. Analiza el contexto normativo y determina los requisitos específicos que afectan a la variable "{variable_recomendacion}".
+    2. Evalúa los valores proporcionados en "Datos del Tramo de Red" en relación con la interrupción reportada y 
+       determina si cumplen con las normativas y buenas prácticas para prevenir interrupciones.
+    3. Proporciona ejemplos concretos, indicando:
+        - Valores óptimos según las normativas para la variable "{variable_recomendacion}".
+        - Ejemplos de valores que podrían generar riesgo de interrupciones futuras.
+        - Alternativas o modificaciones recomendadas para evitar interrupciones similares.
+    4. Responde a la pregunta del usuario ({human_input}) considerando la información disponible.
+    5. Explica claramente la lógica detrás de la recomendación, utilizando fragmentos del contexto normativo para respaldarla.
+    6. Si es necesario, incluye acciones de mantenimiento, refuerzo estructural u otras estrategias para mitigar riesgos.
+
+    Resultado esperado:
+    Una recomendación detallada y justificada sobre la variable "{variable_recomendacion}", enfocada en prevenir interrupciones futuras, 
+    con ejemplos específicos, sugerencias prácticas, y una respuesta clara a la pregunta planteada por el usuario.
+    """
+
+
+    prompt = PromptTemplate(
+        input_variables=["context", "chat_history", "valores_variables","variables_recomendacion","sugerencia"], template=template
+    )
+
+
+    memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+
+    if model=="gpt":
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    elif model=="llama1":
+        llm_chat=ChatOllama(model="llama3.1",temperature=0)
+    elif model=="llama2":
+        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
+
+    
+    chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
+    
+    # Load the chat history of the conversation for every particular agent
+    path_memory=f"memories/{chat_id}.pkl"
+    if os.path.exists(path_memory):
+        with open(path_memory, 'rb') as f:
+            memory = pickle.load(f) #memory of the conversation
+        
+        chain.memory=memory
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
+    # load from disk
+    vectorstore = Chroma(persist_directory=f"./embeddings_by_procces/normativa_tramo_red",embedding_function=embeddings)
+    
+    if human_input == 'Génerame la recomendación':
+        query =sugerencia+" "+seccion_buscar
+    else: 
+        query = human_input
+
+    docs=vectorstore.similarity_search(query,k=5) #Retriever
+    print(docs)
+
+    response=chain({"input_documents": docs, "human_input": human_input, "chat_history":memory,
+                    "valores_variables":valores_variable,"variable_recomendacion":variable_recomendacion,
+                    "sugerencia":sugerencia},
+                    return_only_outputs=False)['output_text'] #AI answer
+
+    
+    #Save the chat history (memory) for a new iteration of the conversation for the general agent:
+    with open(path_memory, 'wb') as f:
+        pickle.dump(chain.memory, f)
+
+
+    with open("answer.pkl", 'wb') as archivo:
+        pickle.dump(response, archivo)
+
+    return response
+
+def obtener_clave_maximo_score(diccionario):
+    """
+    Retorna la clave con el mayor valor en el diccionario.
+    
+    :param diccionario: dict, donde los valores son numéricos.
+    :return: clave con el mayor valor.
+    """
+    if not diccionario:
+        return None  # Retorna None si el diccionario está vacío
+    
+    clave_maxima = max(diccionario, key=diccionario.get)
+    return clave_maxima
+
+def recomendacion_transformadores(model:str, chat_id:str,data_equipo:dict,human_input='Genérame la recomendación') -> str:
+
+    instruction="Basándote en el contexto normativo, los valores proporcionados y la sugerencia, por favor proporciona una recomendación detallada y justificada sobre la variable"
+    variable_recomendacion=data_equipo["Variable_Recomendacion"]
+    variables_recomendacion_apoyos=pd.read_excel("c:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_transformadores.xlsx")
+    sugerencia=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Sugerencia"].iloc[0]
+    seccion_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Seccion_transformadores"].iloc[0]
+    valores_variable=json.dumps(data_equipo["Variable_Valores"])
+
+    template = """
+    Contexto Normativo y Situación:
+    {context}
+
+    Historial de Conversación:
+    {chat_history}
+
+    Datos del Transformador:
+    {valores_variables}
+
+    Situación Reportada:
+    En el transformador especificado, se produjo una interrupción que afectó la continuidad del servicio eléctrico. 
+    Es fundamental garantizar que esta situación no se repita en el futuro. Las recomendaciones deben considerar 
+    tanto el cumplimiento normativo como la prevención de interrupciones similares.
+
+    Variable para la Recomendación:
+    {variable_recomendacion}
+
+    Sugerencia para la Recomendación:
+    {sugerencia}
+
+    Pregunta Actual del Usuario:
+    {human_input}
+
+    Tarea:
+    1. Analiza el contexto normativo y determina los requisitos específicos que afectan a la variable "{variable_recomendacion}".
+    2. Evalúa los valores proporcionados en "Datos del Transformador" en relación con la interrupción reportada y 
+       determina si cumplen con las normativas y buenas prácticas para prevenir interrupciones.
+    3. Proporciona ejemplos concretos, indicando:
+        - Valores óptimos según las normativas para la variable "{variable_recomendacion}".
+        - Ejemplos de valores que podrían generar riesgo de interrupciones futuras.
+        - Alternativas o modificaciones recomendadas para evitar interrupciones similares.
+    4. Responde a la pregunta del usuario ({human_input}) considerando la información disponible.
+    5. Explica claramente la lógica detrás de la recomendación, utilizando fragmentos del contexto normativo para respaldarla.
+    6. Si es necesario, incluye acciones de mantenimiento, refuerzo estructural u otras estrategias para mitigar riesgos.
+
+    Resultado esperado:
+    Una recomendación detallada y justificada sobre la variable "{variable_recomendacion}", enfocada en prevenir interrupciones futuras, 
+    con ejemplos específicos, sugerencias prácticas, y una respuesta clara a la pregunta planteada por el usuario.
+    """
+
+
+    prompt = PromptTemplate(
+        input_variables=["context", "chat_history", "valores_variables","variables_recomendacion","sugerencia"], template=template
+    )
+
+
+    memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+
+    if model=="gpt":
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    elif model=="llama1":
+        llm_chat=ChatOllama(model="llama3.1",temperature=0)
+    elif model=="llama2":
+        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
+
+    
+    chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
+    
+    # Load the chat history of the conversation for every particular agent
+    path_memory=f"memories/{chat_id}.pkl"
+    if os.path.exists(path_memory):
+        with open(path_memory, 'rb') as f:
+            memory = pickle.load(f) #memory of the conversation
+        
+        chain.memory=memory
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
+    # load from disk
+    vectorstore = Chroma(persist_directory=f"./embeddings_by_procces/normativa_transformadores",embedding_function=embeddings)
+    
+    if human_input == 'Génerame la recomendación':
+        query =sugerencia+" "+seccion_buscar
+    else: 
+        query = human_input
+
+    docs=vectorstore.similarity_search(query,k=5) #Retriever
+    print(docs)
+
+    response=chain({"input_documents": docs, "human_input": human_input, "chat_history":memory,
+                    "valores_variables":valores_variable,"variable_recomendacion":variable_recomendacion,
+                    "sugerencia":sugerencia},
+                    return_only_outputs=False)['output_text'] #AI answer
+
+    
+    #Save the chat history (memory) for a new iteration of the conversation for the general agent:
+    with open(path_memory, 'wb') as f:
+        pickle.dump(chain.memory, f)
+
+
+    with open("answer.pkl", 'wb') as archivo:
+        pickle.dump(response, archivo)
+
+    return response
+
+def get_recommendations(data_equipo):
+
+    with open('./chat_data.json', 'r', encoding='utf-8') as archivo:
+        data = json.load(archivo)
+    nueva_data = data.copy()
+    new_chat_id = f'chat-{len(data["chats"])}'
+    nueva_data['chats'][new_chat_id] = {'nombre': None, 'mensajes': [], 'files': []}
+    nueva_data['current_chat_id'] = new_chat_id
+    # Guardar las conversaciones actualizadas
+    save_conversations(nueva_data)
+
+
+    with open('./chat_data.json', 'r', encoding='utf-8') as archivo:
+        data = json.load(archivo)
+    nueva_data = data.copy()
+    chat_id = nueva_data['current_chat_id']
+
+    # Guardar la variable en un archivo JSON 
+    with open('./body_recommendations/'+str(chat_id)+'.json', 'w') as json_file: 
+        json.dump(data_equipo, json_file)
+
+    # Agregar mensaje del usuario y marcar que necesita respuesta
+    mensaje_user = {
+        'autor': 'Tú',
+        'texto': "",
+        'needs_response': True,
+        'modelo': "gpt",      # Guardar el modelo seleccionado
+        'proceso': "recomendacion"     # Guardar el proceso seleccionado
+    }
+    nueva_data['chats'][chat_id]['mensajes'].append(mensaje_user)
+
+    # Si es el primer mensaje del usuario, asignar el nombre del chat
+    if nueva_data['chats'][chat_id]['nombre'] is None:
+        words = "".split()
+        topic = ' '.join(words[:5]) if len(words) >= 5 else ""
+        nueva_data['chats'][chat_id]['nombre'] =  chat_id  # Puedes personalizar el nombre según tu lógica
+
+    nuevo_valor_entrada = ''
+
+    # Guardar las conversaciones actualizadas
+    save_conversations(nueva_data)
+
+
+    with open('./chat_data.json', 'r', encoding='utf-8') as archivo:
+        data = json.load(archivo)
+    chat_id = data.get('current_chat_id')
+    mensajes=data["chats"][chat_id]["mensajes"]
+    last_message=mensajes[-1]
+    mensaje_usuario=last_message["texto"]
+
+    if data_equipo['Equipo'] == 'Apoyo':
+
+        respuesta_asistente = {'autor': 'Asistente', 'texto': recomendacion_apoyos('gpt', chat_id, data_equipo)}
+
+    elif data_equipo['Equipo'] == 'Transformador':
+
+        respuesta_asistente = {'autor': 'Asistente', 'texto': recomendacion_transformadores('gpt', chat_id, data_equipo)}
+
+    elif data_equipo['Equipo'] == 'Switches':
+
+        respuesta_asistente = {'autor': 'Asistente', 'texto': recomendacion_switches('gpt', chat_id, data_equipo)}
+
+    elif data_equipo['Equipo'] == 'Tramo de red':
+
+        respuesta_asistente = {'autor': 'Asistente', 'texto': recomendacion_tramo_red('gpt', chat_id, data_equipo)}
+
+    data['chats'][chat_id]['mensajes'].append(respuesta_asistente)
+
+    last_message["needs_response"]=False
+
+    save_conversations(data)
+
+
     
         

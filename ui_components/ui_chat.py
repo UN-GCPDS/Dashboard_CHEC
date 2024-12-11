@@ -25,6 +25,7 @@ def work_space():
         {"label": "RETIE", "value": "retie"},
         {"label": "Interrupciones", "value": "interrrupciones_transformadores"},
         {"label": "Generar Gráficos", "value": "generate_plots"},
+        {"label": "Recomendación", "value": "recomendacion"},
     ]
 
     PROCESOS_UPLOAD = [proceso for proceso in PROCESOS if proceso["value"] != "general"]
@@ -289,7 +290,7 @@ def create_layout():
                 html.Button(id='button-maps',className='Maps-Button',style={
                     'width': '100%',
                     'height': '12%',
-                    'marginTop': '12vh',
+                    'marginTop': '7vh',
                     'border': '3px solid #068f36',
                     'backgroundColor': '#01471998',
                     'backgroundImage': "url('/assets/images/22ab6d20-fe4b-421e-9ffd-eec28093a1b5.png')",
@@ -301,7 +302,7 @@ def create_layout():
                 html.Button(id='button-graphs',className='Graph-Button',style={
                     'width': '100%',
                     'height': '12%',
-                    'marginTop': '12vh',
+                    'marginTop': '9vh',
                     'border': '3px solid #068f36',
                     'backgroundColor': '#cdcdcd44',
                     'backgroundImage': "url('/assets/images/7f201cec-29ad-4dc6-ad2c-b331f289fd8a.png')",
@@ -313,10 +314,21 @@ def create_layout():
                 html.Button(className='Chat-Button',style={
                     'width': '100%',
                     'height': '12%',
-                    'marginTop': '12vh',
+                    'marginTop': '9vh',
                     'border': '3px solid #068f36',
                     'backgroundColor': '#cdcdcd44',
                     'backgroundImage': "url('/assets/images/ecb71657-f660-4b09-83e9-4f473f3ea97e.png')",
+                    'backgroundSize': '70%',
+                    'backgroundPosition': 'center',
+                    'backgroundRepeat': 'no-repeat',
+                }),
+                html.Button(className='TabNet-Button',style={
+                    'width': '100%',
+                    'height': '12%',
+                    'marginTop': '9vh',
+                    'border': '3px solid #068f36',
+                    'backgroundColor': '#cdcdcd44',
+                    'backgroundImage': "url('/assets/images/stats-graph-svgrepo-com.svg')",
                     'backgroundSize': '70%',
                     'backgroundPosition': 'center',
                     'backgroundRepeat': 'no-repeat',

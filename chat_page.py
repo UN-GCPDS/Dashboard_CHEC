@@ -27,8 +27,9 @@ import io
 import PyPDF2  # Asegúrate de importar PyPDF2 al inicio
 import pickle
 import time
+import maps_page
 
-from functions.utils import load_previous_conversations, save_conversations, conversation, load_structured_data, update_documents_procces
+from functions.utils import load_previous_conversations, save_conversations, conversation, load_structured_data, update_documents_procces, recomendacion_apoyos, get_recommendations
 
 from ui_components.ui_chat import create_layout
 
@@ -162,6 +163,7 @@ PROCESOS = [
     {"label": "RETIE", "value": "retie"},
     {"label": "Interrupciones", "value": "interrrupciones_transformadores"},
     {"label": "Generar Gráficos", "value": "generate_plots"},
+    {"label": "Recomendación", "value": "recomendacion"},
 ]
 
 # Crear una lista sin "General" para la carga de archivos
@@ -173,6 +175,13 @@ UPLOAD_DIRECTORY = "Unstructured_Files"
 if not os.path.exists(UPLOAD_DIRECTORY):
     os.makedirs(UPLOAD_DIRECTORY)
 
+
+if maps_page.criticidad_data is not None:
+    
+    print(maps_page.criticidad_data)
+    get_recommendations(maps_page.criticidad_data)
+
+    
 # Ruta para servir archivos desde 'Unstructured_Files'
 @app.server.route('/Unstructured_Files/<path:filename>')
 def serve_uploaded_file(filename):
@@ -213,6 +222,7 @@ def manejar_chat(n_clicks_nuevo, n_clicks_enviar, n_submit, n_clicks_chat, mensa
     if prop_id == 'nuevo-chat':
         if n_clicks_nuevo:
             new_chat_id = f'chat-{len(data["chats"])}'
+            print("NEW CHAT ID",new_chat_id)
             nueva_data['chats'][new_chat_id] = {'nombre': None, 'mensajes': [], 'files': []}
             nueva_data['current_chat_id'] = new_chat_id
             # Guardar las conversaciones actualizadas
@@ -263,6 +273,7 @@ def manejar_chat(n_clicks_nuevo, n_clicks_enviar, n_submit, n_clicks_chat, mensa
     [Input('toggle-button', 'n_clicks')],
     [State('toggle-state', 'data')]
 )
+
 def toggle_divs(n_clicks, toggle_state):
 
     chats_history_style = [{
