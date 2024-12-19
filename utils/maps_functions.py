@@ -7,7 +7,7 @@ from folium.plugins import HeatMap
 import networkx as nx
 from scipy.spatial import ConvexHull
 from shapely.geometry import LineString, Point
-0
+
 def filtrar_aguas_abajo(grafo, nodo_inicial):
     aguas_abajo = set(nx.descendants(grafo, nodo_inicial))
     aguas_abajo.add(nodo_inicial)
@@ -55,7 +55,7 @@ def load_data():
 
     switches = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/SWITCHES_1.pkl")
 
-    super_eventos = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/SuperEventos.pkl")
+    super_eventos = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/SuperEventos_Criticidad.pkl")
 
     descargas = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/Rayos.pkl")
 
@@ -456,7 +456,7 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
                     z-index:9999; font-size:12px; padding: 8px; opacity: 0.7;">
             <i style="background-color:blue; width: 15px; height: 15px; display: inline-block;"></i> Apoyos<br>
             <i style="background-color:green; width: 15px; height: 15px; display: inline-block;"></i> Trafos<br>
-            <i style="background-color:brown; width: 15px; height: 15px; display: inline-block;"></i> Switches<br>
+            <i style="background-color:purple; width: 15px; height: 15px; display: inline-block;"></i> Switches<br>
             <i style="background-color:black; width: 15px; height: 15px; display: inline-block;"></i> Red MT<br>
             <i style="background-color:yellow; width: 15px; height: 15px; display: inline-block;"></i> CR baja<br>
             <i style="background-color:orange; width: 15px; height: 15px; display: inline-block;"></i> CR media<br>
@@ -467,152 +467,82 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
         # Añadir la leyenda directamente al mapa
         mapa.get_root().html.add_child(folium.Element(legend_html))
 
-        G = nx.DiGraph()
+        nodos_aguas_abajo = set()
+        puntos_equipos = list()
+
+        for evento in super_eventos_seleccionado['evento'].values:
+            df = super_eventos_seleccionado[super_eventos_seleccionado['evento'] == evento]
+            polygon_puntos = eval(df['PUNTOS_POLIGONO'].values[0])
+            # Dibuja el polígono en el mapa
+            match df['NIVEL_C'].values[0]:
+                case 0:
+                    color = 'yellow'
+                case 1:
+                    color = 'orange'
+                case _:
+                    color = 'red'
+            if len(polygon_puntos) != 1:
+                folium.Polygon(locations=polygon_puntos, color=color, fill=True, fill_opacity=0.3, weight=0).add_to(mapa)
+
+            puntos_tramos = eval(df['TRAMOS_AGUAS_ABAJO'].values[0])
+            nodos_aguas_abajo.update(puntos_tramos)
+            
+            puntos_verdes = eval(df['EQUIPOS_PUNTOS'].values[0]) 
+            puntos_equipos.extend(puntos_verdes)
+
         for _, row in redmt_seleccionado.iterrows():
             point1 = (row["LATITUD"], row["LONGITUD"])
             point2 = (row["LATITUD2"], row["LONGITUD2"])
-            if row["ORDER_"] == 1:
-                G.add_edge(point1, point2, id=row["CODE"])
-            else:
-                G.add_edge(point2, point1, id=row["CODE"])
-
-        # Seleccionar un nodo inicial válido del grafo
-        nodo_inicial = list(G.nodes)[335]  # Selecciona el primer nodo como ejemplo
-        print(f"Nodo inicial seleccionado: {nodo_inicial}")
-
-        # Filtrar nodos aguas abajo
-        nodos_aguas_abajo = filtrar_aguas_abajo(G, nodo_inicial)
-
-        # Detectar los puntos dispersos que están cerca de las conexiones aguas abajo
-        puntos_verdes_id = set()  # IDs de los puntos que cumplen el criterio
-        puntos_verdes_coord = set()
-        for _, row in redmt_seleccionado.iterrows():
-            point1 = (row["LATITUD"], row["LONGITUD"])
-            point2 = (row["LATITUD2"], row["LONGITUD2"])
-            if point1 in nodos_aguas_abajo and point2 in nodos_aguas_abajo:
-                line = LineString([point1, point2])
-                for _, row in trafos_seleccionado.iterrows():
-                    p = Point(row["LATITUD"],row["LONGITUD"])
-                    if line.distance(p) < 0.001:  # Umbral de proximidad
-                        puntos_verdes_id.add(row["CODE"])
-                        puntos_verdes_coord.add((row["LATITUD"], row["LONGITUD"]))
-                for _, row in apoyos_seleccionado.iterrows():
-                    p = Point(row["LATITUD"],row["LONGITUD"])
-                    if line.distance(p) < 0.001:  # Umbral de proximidad
-                        puntos_verdes_id.add(row["CODE"])
-                        puntos_verdes_coord.add((row["LATITUD"], row["LONGITUD"]))
-                for _, row in switches_seleccionado.iterrows():
-                    p = Point(row["LATITUD"],row["LONGITUD"])
-                    if line.distance(p) < 0.001:  # Umbral de proximidad
-                        puntos_verdes_id.add(row["CODE"])
-                        puntos_verdes_coord.add((row["LATITUD"], row["LONGITUD"]))
-
-        # Convierte el set en un array de NumPy
-        puntos_array = np.array(list(puntos_verdes_coord))
-        # Calcula el convex hull
-        hull = ConvexHull(puntos_array)
-        # Obtiene los vértices del polígono en el orden del hull
-        polygon_puntos = puntos_array[hull.vertices].tolist()
-
-        # Dibuja el polígono en el mapa
-        folium.Polygon(locations=polygon_puntos, color='orange', fill=True, fill_opacity=0.3, weight=0).add_to(mapa)
-
-        for _, row in super_eventos_seleccionado.iterrows():
-            folium.CircleMarker(
-                location=(row["LATITUD"], row["LONGITUD"]),
-                radius=9,
-                color='red',
-                fill=True,
-                fill_color='red',
-                fill_opacity=0.6,
-                popup=f"Point ID: {row['evento']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}, inicio: {row['inicio']}, fin: {row['fin']}, causa: {row['causa']}, SAIDI: {row['SAIDI']}, SAIFI: {row['SAIFI']}"
-            ).add_to(mapa)  
-
-        # Añadir las conexiones
-        for _, row in redmt_seleccionado.iterrows():
-            point1 = (row["LATITUD"], row["LONGITUD"])
-            point2 = (row["LATITUD2"], row["LONGITUD2"])
-            if (point1 in nodos_aguas_abajo and point2 in nodos_aguas_abajo):
-                color = 'blue'
-            else:
-                color = 'gray'
+            color = 'black' if (point1 in nodos_aguas_abajo and point2 in nodos_aguas_abajo) else 'gray'
+               
             folium.PolyLine(
                 [point1, point2],
                 color=color,
                 weight=3,
-                opacity=0.8,
+                opacity=1.0,
                 popup=f"Connection ID: {row['CODE']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}, Latitud 2: {row['LATITUD2']}, Longitud 2: {row['LONGITUD2']}, ORDER: {row['ORDER_']}"
             ).add_to(mapa)
 
-
-        # Añadir los puntos 
-        for _, row in trafos_seleccionado.iterrows():
-            color = "green" if row["CODE"] in puntos_verdes_id else "gray"
-            folium.CircleMarker(
-                location=(row["LATITUD"], row["LONGITUD"]),
-                radius=5,
-                color=color,
-                fill=True,
-                fill_color=color,
-                fill_opacity=0.6,
-                popup=f"Point ID: {row['CODE']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}"
-            ).add_to(mapa)
-
-        # Añadir los puntos 
-        for _, row in apoyos_seleccionado.iterrows():
-            color = "green" if row["CODE"] in puntos_verdes_id else "gray"
-            folium.CircleMarker(
-                location=(row["LATITUD"], row["LONGITUD"]),
-                radius=5,
-                color=color,
-                fill=True,
-                fill_color=color,
-                fill_opacity=0.6,
-                popup=f"Point ID: {row['CODE']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}"
-            ).add_to(mapa)
-
-        # Añadir los puntos 
-        for _, row in switches_seleccionado.iterrows():
-            color = "green" if row["CODE"] in puntos_verdes_id else "gray"
-            folium.CircleMarker(
-                location=(row["LATITUD"], row["LONGITUD"]),
-                radius=5,
-                color=color,
-                fill=True,
-                fill_color=color,
-                fill_opacity=0.6,
-                popup=f"Point ID: {row['CODE']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}"
-            ).add_to(mapa)       
         
-        '''riesgo_valores = {'2': 3, '1': 2, '0': 1}
+        for _, row in trafos_seleccionado.iterrows():
+            point1 = (row["LATITUD"], row["LONGITUD"])
+            color = 'green' if (point1 in puntos_equipos) else 'gray'
+            folium.CircleMarker(
+                location=(row["LATITUD"], row["LONGITUD"]),
+                radius=5,
+                color=color,
+                fill=True,
+                fill_color=color,
+                fill_opacity=1.0,
+                popup=f"Point ID: {row['CODE']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}"
+            ).add_to(mapa)
 
-        # Diccionario de rangos normalizados para cada nivel de riesgo
-        riesgo_valores_normalizados = {'0': (0.0, 0.33), '1': (0.33, 0.66), '2': (0.66, 1.0)}
+        for _, row in apoyos_seleccionado.iterrows():
+            point1 = (row["LATITUD"], row["LONGITUD"])
+            color = 'blue' if (point1 in puntos_equipos) else 'gray'
+            folium.CircleMarker(
+                location=(row["LATITUD"], row["LONGITUD"]),
+                radius=5,
+                color=color,
+                fill=True,
+                fill_color=color,
+                fill_opacity=1.0,
+                popup=f"Point ID: {row['CODE']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}"
+            ).add_to(mapa)
 
-        # Gradiente general (amarillo, naranja, rojo)
-        gradient_general = {
-            0.0: 'yellow',  # Riesgo bajo
-            0.33: 'orange', # Riesgo medio
-            0.66: '#FF4500', # Naranja oscuro (inicio del riesgo alto)
-            1.0: 'red'      # Riesgo máximo
-        }
-
-        # Crear una lista de datos con intensidades normalizadas
-        heat_data = []
-        for _, row in super_eventos_seleccionado.iterrows():
-            nivel_riesgo = str(row['NIVEL_C'])
-            rango_min, rango_max = riesgo_valores_normalizados[nivel_riesgo]
-            intensidad_normalizada = rango_min + (riesgo_valores[nivel_riesgo] - 1) * (rango_max - rango_min) / 2
-            heat_data.append([row['LATITUD'], row['LONGITUD'], intensidad_normalizada])
-
-        # Agregar el HeatMap al mapa
-        HeatMap(
-            data=heat_data,
-            min_opacity=0.5,
-            radius=15,
-            gradient=gradient_general
-        ).add_to(mapa)
-        '''
+        for _, row in switches_seleccionado.iterrows():
+            point1 = (row["LATITUD"], row["LONGITUD"])
+            color = 'purple' if (point1 in puntos_equipos) else 'gray'
+            folium.CircleMarker(
+                location=(row["LATITUD"], row["LONGITUD"]),
+                radius=5,
+                color=color,
+                fill=True,
+                fill_color=color,
+                fill_opacity=1.0,
+                popup=f"Point ID: {row['CODE']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}"
+            ).add_to(mapa)
+       
 
         mapa_html = mapa._repr_html_()
     

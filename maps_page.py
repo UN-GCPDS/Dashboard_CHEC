@@ -69,14 +69,15 @@ layout.children[1]['cond-env-container'].children = dcc.Dropdown(
                 )
 
 criticidad_data = {'Equipo':'Apoyo',
-                   'Variable_Valores': {'MATERIAL': 'Torrecilla metalica', 'LONG_APOYO':'12.0', 'TIERRA_PIE': 'T', 'VIENTOS': '5.0'},
-                   'CARGA_TRABAJO': '12.0',
-                   'ALTURA_APOYO': '6.0',
-                   'UBICACICIÓN': '(5.96,-75.69)',
-                   'ÍNDICE_RAYO': '2.0',
-                   'PRECIPITACIÓN': '4.0',
-                   'RADIACIÓN_UV': '5.0',
-                   'TEMPERATURA': '30.0',
+                   'Variable_Valores': {'MATERIAL': 'Torrecilla metalica', 
+                                        'LONG_APOYO':'12.0', 
+                                        'TIERRA_PIE': 'T', 
+                                        'VIENTO': '5.0',
+                                        'ÍNDICE_RAYOS': '2.0',
+                                        'PRECIPITACIÓN': '4.0',
+                                        'RADIACIÓN_UV': '5.0',
+                                        'TEMPERATURA': '30.0',
+                                        },
                    'Variable_Recomendacion': 'TEMPERATURA'}
 
 '''criticidad_data = {'Equipo':'Tramo de red',
@@ -199,7 +200,7 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
         map_frame = html.Iframe(
             srcDoc=folium_map,
             style={
-                'width': '100%%', 'overflow': 'hidden', 'border': 'none',
+                'width': '100%', 'overflow': 'hidden', 'border': 'none',
                 '-ms-overflow-style': 'none', 'scrollbar-width': 'none', 'height': '100%',
                 'position': 'relative', 'scrollbar-height': 'none !important', 'margin-bottom': '1vh',
                 'object-fit': 'cover', 'overflow-y': 'hidden', 'max-height': '59vh'
@@ -207,11 +208,12 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
             id='folium_map_frame',
             width='100%', height='100%',
         )
-        div_content = html.Div([
+        div_content = html.Div(children = [
             html.Div(style={
                 'display': 'flex',
                 'flexDirection': 'row',
-                'alignItems': 'center'},
+                'alignItems': 'center',
+                'width': '100%'},
                 children=[
                     dbc.Button(
                             html.I(className="bi bi-arrow-left"),  # Flecha hacia la izquierda
@@ -253,13 +255,15 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
                                 'cursor': 'pointer'}
                         ),
                 ]),
-            html.Div(className='Map_container_2',style={
+            html.Div(className='Map_container_2', style={
                 'display': 'flex',
                 'flexDirection': 'row',
                 'alignItems': 'center',
-                'height': '53vh',
+                'height': '51.5vh',
+                'width': '100%',  # Add width to ensure full container width
+                'margin': '1vh 1vh 1vh 0',
                 }, children=[
-                    html.Div(className='criteria-container', style={
+                    html.Div(className='criterias-container', style={
                         'position': 'relative',
                         'width': '13%',
                         'height': '100%',
@@ -271,7 +275,7 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
                         'flexDirection': 'column',
                         'alignItems': 'center',
                         }, children=[
-                            html.Div('Evento',className='text-criteria', style={
+                            html.Div('Evento',className='text-evento', style={
                                 'width': '100%',
                                 'height': '5%',
                                 'lineHeight': '13vh',
@@ -283,25 +287,28 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
                                 'display': 'flex',
                                 'alignItems': 'center',
                                 'justifyContent': 'center',
-                                'margin': '1vh 0 0 0'
+                                'margin': '1vh 0 0 0',
+                                'zIndex': '950',
                             }),
-                            html.Div(className='criteria-container', style={
+                            html.Div(className='evento-container', style={
                                 'width': '70%',
                                 'height': '4%',
-                                'borderRadius': '5px', 
+                                'borderRadius': '5px',
+                                'zIndex': '850',
+                                'margin': '1vh 0 0 0',
                             }, children=[
                                 dcc.Dropdown(
-                                    id='select-criteria',
+                                    id='select-evento',
                                     options=['','1','2','3'],
                                     value='',  # Select the first option as default
                                 style={'position': 'relative',
                                     'width': '100%',
                                     'height': '4%',
-                                    'zIndex': 1000,
                                     'border': 'none',
                                     'color': '#00782b',
                                     'font-family': 'DM Sans !important' ,
-                                    'font-size': '20px'},
+                                    'font-size': '20px',
+                                    'zIndex': '850',},
                                 )
                             ]),
                             html.Button('OK', className='confirm-button', style={
@@ -316,7 +323,9 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
                                         'height': '8%',
                                         'backgroundColor': '#11BB52CF',
                                         'position': 'relative',
-                                    }, id="confirm-button-ok", n_clicks=0),
+                                        'zIndex': '750',
+                                        'margin': '3vh 0 0 0',
+                                    }, id="confirm-button-evento", n_clicks=0),
                             html.Div('Tipo equipo',className='text-criteria', style={
                                 'width': '100%',
                                 'height': '5%',
@@ -329,29 +338,52 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
                                 'display': 'flex',
                                 'alignItems': 'center',
                                 'justifyContent': 'center',
-                                'margin': '1vh 0 0 0'
+                                'margin': '1vh 0 0 0',
+                                'zIndex': '650',
                             }),
-                            html.Div(className='criteria-container', style={
+                            html.Div(className='tipo-equipo-container', style={
                                 'width': '84%',
                                 'height': '4%',
                                 'borderRadius': '5px', 
-                                'margin': '5% 0 0 0',
+                                'margin': '1vh 0 0 0',
+                                'zIndex': '550',
                             }, children=[
                                 dcc.Dropdown(
-                                    id='select-criteria',
+                                    id='select-tipo-equipo',
                                     options=['', 'Tramo de línea', 'Transformador', 'Switche'],
                                     value='',  # Select the first option as default
                                 style={'position': 'relative',
                                     'width': '100%',
                                     'height': '4%',
-                                    'zIndex': 1000,
                                     'border': 'none',
                                     'color': '#00782b',
                                     'font-family': 'DM Sans !important' ,
-                                    'font-size': '20px'},
+                                    'font-size': '20px',
+                                    'zIndex': '550',},
                                 )
                                 ]),
-                            html.Button('OK', className='confirm-button', style={
+                            html.Div(className='equipo-container', style={
+                                'width': '84%',
+                                'height': '4%',
+                                'borderRadius': '5px', 
+                                'margin': '3vh 0 0 0',
+                                'zIndex': '450',
+                            }, children=[
+                                dcc.Dropdown(
+                                    id='select-equipo',
+                                    options=['', 'Tramo de línea', 'Transformador', 'Switche'],
+                                    value='',  # Select the first option as default
+                                style={'position': 'relative',
+                                    'width': '100%',
+                                    'height': '4%',
+                                    'border': 'none',
+                                    'color': '#00782b',
+                                    'font-family': 'DM Sans !important' ,
+                                    'font-size': '20px',
+                                    'zIndex': '450',},
+                                )
+                                ]),
+                            html.Button('Recomendación', id='recomendacion-button',className='recomendacion-button', style={
                                         'fontFamily': "'DM Sans', sans-serif",
                                         'fontSize': '16px',
                                         'fontWeight': '700',
@@ -359,14 +391,25 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
                                         'cursor': 'pointer',
                                         'borderRadius': '3px',
                                         'borderColor': 'white',
-                                        'width': '27%',
+                                        'width': '82%',
                                         'height': '8%',
                                         'backgroundColor': '#11BB52CF',
                                         'position': 'relative',
-                                    }, id="confirm-button-ok", n_clicks=0),   
-                            ])]),
-                    map_frame
+                                        'zIndex': '350',
+                                        'margin': '3vh 0 0 0',
+                                    }, n_clicks=0),
+                        ]),
+                    html.Div(className='map-map-2', style={
+                        'position': 'relative', 
+                        'width': '85%',  # Adjust width to fit within the container
+                        'height': '100%'  # Ensure full height
+                    }, children=[map_frame])
                 ])
+                ], style={
+                    'display': 'flex',
+                    'flexDirection': 'column',
+                    'alignItems': 'center',
+                })
         return div_content
     return dash.no_update
 

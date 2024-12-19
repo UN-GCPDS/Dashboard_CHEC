@@ -276,55 +276,39 @@ def recomendacion_apoyos(model:str, chat_id:str,data_equipo:dict,human_input='Ge
 
     instruction="Basándote en el contexto normativo, los valores proporcionados y la sugerencia, por favor proporciona una recomendación detallada y justificada sobre la variable"
     variable_recomendacion=data_equipo["Variable_Recomendacion"]
+    #variables_recomendacion_apoyos=pd.read_excel("C:/Users/spine/Downloads/variables_apoyos.xlsx")
     variables_recomendacion_apoyos=pd.read_excel("c:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_apoyos.xlsx")
     sugerencia=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Sugerencia"].iloc[0]
-    seccion_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Seccion_apoyos"].iloc[0]
+    seccion_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Normativa"].iloc[0]
+    documento_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Documento "].iloc[0]
     valores_variable=json.dumps(data_equipo["Variable_Valores"])
+  
+    
+    template="""Eres un experto técnico en infraestructura eléctrica. Tu función es dar recomendaciones y pautas 
+                normativas basadas en el contexto que se te proporciona. 
 
-    template = """
-    Contexto Normativo y Situación:
-    {context}
+                De acuerdo al valor de la variable que menciona el usuario en su pregunta, sigue estos pasos:
+                1. Identifica la variable y el valor que proporciona el usuario.
+                2. Consulta el contexto normativo proporcionado (por ejemplo, normas mínimas o rangos admitidos).
+                3. Compara el valor dado con las normas del contexto.
+                - Si el valor NO cumple con la norma, debes decirlo claramente, explicar por qué no cumple y recomendar la acción necesaria (por ejemplo, aumentar la longitud, reemplazar el apoyo, etc.).
+                - Si el valor SÍ cumple con la norma, debes confirmarlo y, de ser necesario, brindar información adicional que refuerce la recomendación.
+                4. Presenta la respuesta de forma clara y directa. Si se requiere, enumera pasos o consideraciones técnicas.
+                
+                
+                Usa el contexto y el historial de la conversación para 
+                responder a las preguntas del usuario:
 
-    Historial de Conversación:
-    {chat_history}
+            {context}
 
-    Datos del Apoyo/Poste:
-    {valores_variables}
-
-    Situación Reportada:
-    En el apoyo/poste especificado, se produjo una interrupción que afectó la continuidad del servicio eléctrico. 
-    Es fundamental garantizar que esta situación no se repita en el futuro. Las recomendaciones deben considerar 
-    tanto el cumplimiento normativo como la prevención de interrupciones similares.
-
-    Variable para la Recomendación:
-    {variable_recomendacion}
-
-    Sugerencia para la Recomendación:
-    {sugerencia}
-
-    Pregunta Actual del Usuario:
-    {human_input}
-
-    Tarea:
-    1. Analiza el contexto normativo y determina los requisitos específicos que afectan a la variable "{variable_recomendacion}".
-    2. Evalúa los valores proporcionados en "Datos del Apoyo/Poste" en relación con la interrupción reportada y 
-       determina si cumplen con las normativas y buenas prácticas para prevenir interrupciones.
-    3. Proporciona ejemplos concretos, indicando:
-        - Valores óptimos según las normativas para la variable "{variable_recomendacion}".
-        - Ejemplos de valores que podrían generar riesgo de interrupciones futuras.
-        - Alternativas o modificaciones recomendadas para evitar interrupciones similares.
-    4. Responde a la pregunta del usuario ({human_input}) considerando la información disponible.
-    5. Explica claramente la lógica detrás de la recomendación, utilizando fragmentos del contexto normativo para respaldarla.
-    6. Si es necesario, incluye acciones de mantenimiento, refuerzo estructural u otras estrategias para mitigar riesgos.
-
-    Resultado esperado:
-    Una recomendación detallada y justificada sobre la variable "{variable_recomendacion}", enfocada en prevenir interrupciones futuras, 
-    con ejemplos específicos, sugerencias prácticas, y una respuesta clara a la pregunta planteada por el usuario.
-    """
+            {chat_history}
+            Human: {human_input}
+            Chatbot (RESPUESTA RECOMENDACIÓN):
+            """
 
 
     prompt = PromptTemplate(
-        input_variables=["context", "chat_history", "valores_variables","variables_recomendacion","sugerencia"], template=template
+        input_variables=["chat_history", "human_input", "context"], template=template
     )
 
 
@@ -339,9 +323,11 @@ def recomendacion_apoyos(model:str, chat_id:str,data_equipo:dict,human_input='Ge
 
     
     chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
-    
+
     # Load the chat history of the conversation for every particular agent
     path_memory=f"memories/{chat_id}.pkl"
+    
+    
     if os.path.exists(path_memory):
         with open(path_memory, 'rb') as f:
             memory = pickle.load(f) #memory of the conversation
@@ -350,20 +336,26 @@ def recomendacion_apoyos(model:str, chat_id:str,data_equipo:dict,human_input='Ge
 
     embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
     # load from disk
-    vectorstore = Chroma(persist_directory=f"./embeddings_by_procces/normativa_apoyos",embedding_function=embeddings)
+    vectorstore = Chroma(persist_directory=f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/Dashboard_CHEC/embeddings_by_procces/{documento_buscar}",embedding_function=embeddings)
     
     if human_input == 'Génerame la recomendación':
-        query = sugerencia + " " + seccion_buscar
+        query =sugerencia+" "+seccion_buscar
     else: 
         query = human_input
 
     docs=vectorstore.similarity_search(query,k=5) #Retriever
     print(docs)
+    
+    if human_input == 'Genérame la recomendación':
+        query=f"Generame una recomendación para la variable {variable_recomendacion}, la cual tiene un valor de {data_equipo['Variable_Valores'][variable_recomendacion]}. {sugerencia}"
+    else:
+        query=human_input
 
-    response=chain({"input_documents": docs, "human_input": human_input, "chat_history":memory,
-                    "valores_variables":valores_variable,"variable_recomendacion":variable_recomendacion,
-                    "sugerencia":sugerencia},
-                    return_only_outputs=False)['output_text'] #AI answer
+    response_all=chain({"input_documents": docs, "human_input": query, "chat_history":memory}, #,"sugerencia":sugerencia},
+                    return_only_outputs=False) #AI answer
+    
+
+    response=response_all['output_text']
 
     
     #Save the chat history (memory) for a new iteration of the conversation for the general agent:
