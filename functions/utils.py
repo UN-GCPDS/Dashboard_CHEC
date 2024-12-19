@@ -177,8 +177,11 @@ def conversation(chat_id,query,model,procces):
             data_equipo = json.load(json_file)
 
         if model=="llama3.2":
+
             model="llama2"
+            
         elif model=="llama3.1":
+
             model="llama1"
 
         
