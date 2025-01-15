@@ -35,12 +35,10 @@ selection_criteria = [[''],['','','',''],['','','',''],['','','',''],['','','','
 count_clicks = -1
 count = 0
 
-# Ruta de la carpeta donde guardas las imágenes
-OUTPUTS_FOLDER = "./outputs"
-
-@app.server.route('/outputs/<path:filename>')
+# Para la carpeta outputs
+@app.server.route('/outputs/<path:filename>', endpoint='serve_outputs')
 def serve_outputs(filename):
-    return send_from_directory(OUTPUTS_FOLDER, filename)
+   return send_from_directory("./outputs", filename)
 
 # First callback to create the map and slider
 @app.callback(
@@ -3198,9 +3196,10 @@ def download_file(n_clicks):
 @app.callback(
     Output('url-graphs', 'pathname'),
     [Input('button-chat', 'n_clicks'),
-     Input('button-maps', 'n_clicks')]
+     Input('button-maps', 'n_clicks'),
+     Input('button-tab-net', 'n_clicks')]
 )
-def redirect_to_pages(n_clicks_chat, n_clicks_maps):
+def redirect_to_pages(n_clicks_chat, n_clicks_maps, n_clicks_tab_net):
     # Obtener el contexto del trigger
     ctx = callback_context
     if not ctx.triggered:
@@ -3213,5 +3212,7 @@ def redirect_to_pages(n_clicks_chat, n_clicks_maps):
         return "/chat_page"
     elif triggered_id == 'button-maps' and n_clicks_maps:
         return "/maps_page"
+    elif triggered_id == 'button-tab-net' and n_clicks_tab_net:
+        return "/tab-net_page"
 
     raise exceptions.PreventUpdate

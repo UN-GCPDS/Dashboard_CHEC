@@ -83,6 +83,7 @@ ESTILOS = {
         'alignSelf': 'flex-end',
         'margin': '5px',
         'fontSize': '19px',
+        'white-space': 'pre-wrap',
     },
     'mensaje_asistente': {
         'textAlign': 'left',
@@ -94,6 +95,7 @@ ESTILOS = {
         'alignSelf': 'flex-start',
         'margin': '5px',
         'fontSize': '19px',
+        'white-space': 'pre-wrap',
     },
     'logo_chec': {
         'width': '200px',          # Aumenta el ancho a 200 píxeles
@@ -178,7 +180,6 @@ if not os.path.exists(UPLOAD_DIRECTORY):
 
 if maps_page.criticidad_data is not None:
     
-    print(maps_page.criticidad_data)
     get_recommendations(maps_page.criticidad_data)
 
     
@@ -460,7 +461,7 @@ def actualizar_ventana_chat(data):
             estilo_mensaje = ESTILOS['mensaje_usuario'] if msg['autor'] == 'Tú' else ESTILOS['mensaje_asistente']
             contenido.append(html.Div(
                 html.P(f"{msg['texto']}", style=estilo_mensaje),
-                style={'display': 'flex', 'justifyContent': 'flex-end' if msg['autor'] == 'Tú' else 'flex-start'}
+                style={'display': 'flex', 'justifyContent': 'flex-end' if msg['autor'] == 'Tú' else 'flex-start', 'white-space': 'pre-wrap'}
             ))
         elif 'imagen' in msg:
             # Estilo para la imagen del asistente
@@ -557,9 +558,10 @@ def handle_file_upload(contents, filename, proceso_seleccionado):
 @app.callback(
     Output('url-chat', 'pathname'),
     [Input('button-maps', 'n_clicks'),
-     Input('button-graphs', 'n_clicks')]
+     Input('button-graphs', 'n_clicks'),
+     Input('button-tab-net', 'n_clicks')]
 )
-def redirect_to_pages(n_clicks_maps, n_clicks_graphs):
+def redirect_to_pages(n_clicks_maps, n_clicks_graphs, n_clicks_tab_net):
     # Obtener el contexto del trigger
     ctx = callback_context
     if not ctx.triggered:
@@ -572,5 +574,7 @@ def redirect_to_pages(n_clicks_maps, n_clicks_graphs):
         return "/maps_page"
     elif triggered_id == 'button-graphs' and n_clicks_graphs:
         return "/graphs_page"
+    elif triggered_id == 'button-tab-net' and n_clicks_tab_net:
+        return "/tab-net_page"
 
     raise exceptions.PreventUpdate

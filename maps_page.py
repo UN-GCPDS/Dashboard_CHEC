@@ -2,6 +2,8 @@ import gc
 import json
 from app import app
 import dash
+from dash.exceptions import PreventUpdate
+from dash.dependencies import MATCH, ALL
 from dash import callback_context, exceptions
 from dash import Dash, html, dcc, Output, Input, State, ctx
 import dash_bootstrap_components as dbc
@@ -23,11 +25,20 @@ data_frame = None
 day = None
 map_frame = None
 condition = None
+count_clicks = -1
 
 options_dates =  sorted(total_data[0].FECHA.unique())
 options_dates = [date.strftime('%Y-%m') for date in options_dates]
 
 options_municipios = sorted(total_data[0].MUN.unique())
+
+options_eventos = ['']
+options_tipo_equipo = ['']
+options_equipos = ['']
+codes = None
+evento_id = None
+tipo_equipo_id = None
+equipo_id = None
 
 layout.children[1]['date-container'].children = dcc.Dropdown(
                 id='select-date',
@@ -68,7 +79,19 @@ layout.children[1]['cond-env-container'].children = dcc.Dropdown(
                        'font-size': '20px'},
                 )
 
-criticidad_data = {'Equipo':'Apoyo',
+
+'''criticidad_data = None'''
+criticidad_data = {"B2927":{
+                    "Tipo_de_equipo":"tramo_red",
+                    "top_5": {'KVNOM': "33", 'MATERIALCONDUCTOR': "ACSR", 'CALIBRECONDUCTOR': "2", 'VELOCIDAD_VIENTO': "1.2", 'TEMPERATURA': "20"}},
+                    "B65026":{
+                    "Tipo_de_equipo":"apoyo",
+                    "top_5": {'MATERIAL': "Poste en Concreto", 'LONG_APOYO': "8.0", 'TIERRA_PIE': "T", 'VIENTO': "1.2", 'TEMPERATURA': "18.0"}},
+                    "L18033":{
+                    "Tipo_de_equipo": "apoyo",
+                    "top_5": {'MATERIAL': "Torrecilla Metálica Triangular", 'LONG_APOYO': "10.0", 'TIERRA_PIE': "T", 'VIENTO': "1.2", 'TEMPERATURA': "14.0"}}}
+
+'''criticidad_data = {'Equipo':'Apoyo',
                    'Variable_Valores': {'MATERIAL': 'Torrecilla metalica', 
                                         'LONG_APOYO':'12.0', 
                                         'TIERRA_PIE': 'T', 
@@ -78,7 +101,7 @@ criticidad_data = {'Equipo':'Apoyo',
                                         'RADIACIÓN_UV': '5.0',
                                         'TEMPERATURA': '30.0',
                                         },
-                   'Variable_Recomendacion': 'TEMPERATURA'}
+                   'Variable_Recomendacion': 'TEMPERATURA'}'''
 
 '''criticidad_data = {'Equipo':'Tramo de red',
                    'Variable_Valores': {'KVNOM': '10.0', 'MATERIALCONDUCTOR':'Cobre', 'CALIBRECONDUCTOR': '12.0', 
@@ -108,7 +131,7 @@ criticidad_data['Variable_Recomendacion'] = obtener_clave_maximo_score(criticida
     State('map-container', 'children')
 )
 def initialize_map(selected_date, selected_municipios, selected_env_condition, n_clicks, current_map_content):
-    global click_count, data_frame, day, condition
+    global click_count, data_frame, day, condition, options_eventos, options_tipo_equipo, options_equipos, codes
     condition = selected_env_condition
     if (n_clicks > click_count) & (condition != 'CRITICIDAD'):
         click_count = n_clicks
@@ -185,16 +208,19 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
                 'display': 'flex', 'flexDirection': 'column',
                 'height': '100%', 'gap': '10px', 'overflow': 'hidden'})
         return div_content
+    
     if (n_clicks > click_count) & (condition == 'CRITICIDAD'):
         click_count = n_clicks
         data_frame = select_data(
             int(selected_date[:4]), int(selected_date[5:7]), selected_municipios,
             total_data[0], total_data[1], total_data[2], total_data[3], total_data[4], total_data[5], total_data[6]
         )
-        folium_map = map_folium(
+        folium_map, codes = map_folium(
             data_frame[0], data_frame[1], data_frame[2], data_frame[3],
             data_frame[4][0], data_frame[5][0], data_frame[6][0],condition
         )
+
+        options_eventos = sorted(data_frame[4][0]['evento'].unique())
 
         # Create the map and slider
         map_frame = html.Iframe(
@@ -299,7 +325,7 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
                             }, children=[
                                 dcc.Dropdown(
                                     id='select-evento',
-                                    options=['','1','2','3'],
+                                    options=options_eventos,
                                     value='',  # Select the first option as default
                                 style={'position': 'relative',
                                     'width': '100%',
@@ -311,78 +337,6 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
                                     'zIndex': '850',},
                                 )
                             ]),
-                            html.Button('OK', className='confirm-button', style={
-                                        'fontFamily': "'DM Sans', sans-serif",
-                                        'fontSize': '16px',
-                                        'fontWeight': '700',
-                                        'color': 'black',
-                                        'cursor': 'pointer',
-                                        'borderRadius': '3px',
-                                        'borderColor': 'white',
-                                        'width': '27%',
-                                        'height': '8%',
-                                        'backgroundColor': '#11BB52CF',
-                                        'position': 'relative',
-                                        'zIndex': '750',
-                                        'margin': '3vh 0 0 0',
-                                    }, id="confirm-button-evento", n_clicks=0),
-                            html.Div('Tipo equipo',className='text-criteria', style={
-                                'width': '100%',
-                                'height': '5%',
-                                'lineHeight': '13vh',
-                                'color': '#FFFFFF',
-                                'fontFamily': "'DM Sans', sans-serif",
-                                'fontSize': '25px',
-                                'fontWeight': '700',
-                                'textAlign': 'center',
-                                'display': 'flex',
-                                'alignItems': 'center',
-                                'justifyContent': 'center',
-                                'margin': '1vh 0 0 0',
-                                'zIndex': '650',
-                            }),
-                            html.Div(className='tipo-equipo-container', style={
-                                'width': '84%',
-                                'height': '4%',
-                                'borderRadius': '5px', 
-                                'margin': '1vh 0 0 0',
-                                'zIndex': '550',
-                            }, children=[
-                                dcc.Dropdown(
-                                    id='select-tipo-equipo',
-                                    options=['', 'Tramo de línea', 'Transformador', 'Switche'],
-                                    value='',  # Select the first option as default
-                                style={'position': 'relative',
-                                    'width': '100%',
-                                    'height': '4%',
-                                    'border': 'none',
-                                    'color': '#00782b',
-                                    'font-family': 'DM Sans !important' ,
-                                    'font-size': '20px',
-                                    'zIndex': '550',},
-                                )
-                                ]),
-                            html.Div(className='equipo-container', style={
-                                'width': '84%',
-                                'height': '4%',
-                                'borderRadius': '5px', 
-                                'margin': '3vh 0 0 0',
-                                'zIndex': '450',
-                            }, children=[
-                                dcc.Dropdown(
-                                    id='select-equipo',
-                                    options=['', 'Tramo de línea', 'Transformador', 'Switche'],
-                                    value='',  # Select the first option as default
-                                style={'position': 'relative',
-                                    'width': '100%',
-                                    'height': '4%',
-                                    'border': 'none',
-                                    'color': '#00782b',
-                                    'font-family': 'DM Sans !important' ,
-                                    'font-size': '20px',
-                                    'zIndex': '450',},
-                                )
-                                ]),
                             html.Button('Recomendación', id='recomendacion-button',className='recomendacion-button', style={
                                         'fontFamily': "'DM Sans', sans-serif",
                                         'fontSize': '16px',
@@ -415,7 +369,9 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
 
 # Second callback to update the map when the slider changes
 @app.callback(
-    [Output('date-slider', 'value'), Output('folium_map_frame', 'srcDoc')],
+    [Output('date-slider', 'value'), 
+     Output('folium_map_frame', 'srcDoc'), 
+     Output('select-evento', 'options')],
     [Input('decrease-btn', 'n_clicks'),
      Input('increase-btn', 'n_clicks'),
      Input('date-slider', 'value')],
@@ -423,11 +379,8 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
      State('date-slider', 'max')]
 )
 def update_slider_and_map(decrease_clicks, increase_clicks, slider_value, slider_min, slider_max):
-    # Inicializa clics en 0 si son None
     decrease_clicks = decrease_clicks or 0
     increase_clicks = increase_clicks or 0
-
-    # Determina cuál botón fue presionado
     triggered_id = ctx.triggered_id
 
     if triggered_id == "decrease-btn" and slider_value > slider_min:
@@ -435,27 +388,108 @@ def update_slider_and_map(decrease_clicks, increase_clicks, slider_value, slider
     elif triggered_id == "increase-btn" and slider_value < slider_max:
         slider_value += 1
 
-    # Lógica para actualizar el mapa
-    global day, data_frame, condition
-    if slider_value != day:
-        day = slider_value
-        print(f'Value:{day}')
+    global day, data_frame, condition, options_eventos, codes
+    
+    # Si no hay cambio en el slider
+    if slider_value == day:
+        return slider_value, dash.no_update, dash.no_update
+
+    day = slider_value
+    print(f'Value:{day}')
+
+    if condition == 'CRITICIDAD':
+        folium_map, codes = map_folium(
+            data_frame[0], data_frame[1], data_frame[2], data_frame[3],
+            data_frame[4][day-1], data_frame[5][day-1], data_frame[6][day-1], condition
+        )
+        options_eventos = sorted(data_frame[4][day-1]['evento'].unique())
+        return slider_value, folium_map, [{'label': opt, 'value': opt} for opt in options_eventos]
+    else:
         folium_map = map_folium(
             data_frame[0], data_frame[1], data_frame[2], data_frame[3],
             data_frame[4][day-1], data_frame[5][day-1], data_frame[6][day-1], condition
         )
-        # Devuelve el nuevo valor del slider y el HTML del mapa
-        return slider_value, folium_map
+        
+        return slider_value, folium_map, dash.no_update
 
-    # Si no hubo cambios en el slider, solo actualiza su valor
-    return slider_value, dash.no_update
+    return slider_value, dash.no_update, dash.no_update
+
+@app.callback(
+    Output('url-maps', 'pathname'),
+    [
+        Input('recomendacion-button', 'n_clicks'),
+        Input('button-chat', 'n_clicks'),
+        Input('button-graphs', 'n_clicks'),
+        Input('button-tab-net', 'n_clicks')
+    ],
+    prevent_initial_call=True
+)
+def handle_url_update(select_evento_clicks, n_clicks_chat, n_clicks_graphs, n_clicks_tab_net):
+    global evento_id
+
+    # Obtener el contexto del trigger
+    ctx = callback_context
+    if not ctx.triggered:
+        raise exceptions.PreventUpdate
+
+    # Identificar qué entrada disparó el callback
+    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # Lógica para 'select-evento'
+    if triggered_id == 'recomendacion-button' and select_evento_clicks:
+        if (select_evento_clicks != evento_id) and (select_evento_clicks != None):
+            evento_id = select_evento_clicks
+            return "/chat_page"  # Cambia esto al pathname correspondiente
+
+    # Lógica para los botones
+    if triggered_id == 'button-chat' and n_clicks_chat:
+        return "/chat_page"
+    elif triggered_id == 'button-graphs' and n_clicks_graphs:
+        return "/graphs_page"
+    elif triggered_id == 'button-tab-net' and n_clicks_tab_net:
+        return "/tab-net_page"
+
+    raise exceptions.PreventUpdate
+
+ 
+
+
+
+'''@app.callback(Output('select-equipo-2', 'options'),
+              Input('select-tipo-equipo', 'value'))
+
+def update_tipo_equipo(tipo_equipo_value):
+    global options_tipo_equipo, options_equipos, tipo_equipo_id
+    if tipo_equipo_value != tipo_equipo_id:
+        match tipo_equipo_value:
+            case 'Tramo de línea':
+                options_equipos = [''] + codes[0]
+            case 'Transformador':
+                options_equipos = [''] + codes[1]
+            case 'Apoyo':
+                options_equipos = [''] + codes[2]
+            case 'Interruptor':
+                options_equipos = [''] + codes[3]
+            case _:
+                options_equipos = ['']
+            
+        return options_equipos
+    return dash.no_update
+
+@app.callback(Input('select-equipo-2', 'value'))
+
+def update_equipo(equipo_value):
+    global equipo_id
+    if equipo_value != equipo_id:
+        equipo_id = equipo_value
 
 @app.callback(
     Output('url-maps', 'pathname'),
     [Input('button-chat', 'n_clicks'),
-     Input('button-graphs', 'n_clicks')]
+     Input('button-graphs', 'n_clicks'),
+     Input('button-tab-net', 'n_clicks')]
 )
-def redirect_to_pages(n_clicks_chat, n_clicks_graphs):
+def redirect_to_pages(n_clicks_chat, n_clicks_graphs, n_clicks_tab_net):
     # Obtener el contexto del trigger
     ctx = callback_context
     if not ctx.triggered:
@@ -468,5 +502,7 @@ def redirect_to_pages(n_clicks_chat, n_clicks_graphs):
         return "/chat_page"
     elif triggered_id == 'button-graphs' and n_clicks_graphs:
         return "/graphs_page"
+    elif triggered_id == 'button-tab-net' and n_clicks_tab_net:
+        return "/tab-net_page"
 
-    raise exceptions.PreventUpdate
+    raise exceptions.PreventUpdate'''

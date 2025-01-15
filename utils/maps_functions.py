@@ -55,7 +55,7 @@ def load_data():
 
     switches = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/SWITCHES_1.pkl")
 
-    super_eventos = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/SuperEventos_Criticidad.pkl")
+    super_eventos = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/SuperEventos_Criticidad_AguasAbajo.pkl")
 
     descargas = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/Rayos.pkl")
 
@@ -181,6 +181,8 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
         
         mapa_html = mapa._repr_html_()
 
+        return mapa_html
+
     elif condicion == 'DESCARGAS':
 
         # Crear un mapa centrado en la media de las coordenadas de los circuitos
@@ -284,6 +286,8 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
             ).add_to(mapa)
 
         mapa_html = mapa._repr_html_()
+
+        return mapa_html
     
     elif condicion == 'VEGETACION':
 
@@ -311,13 +315,14 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
        # Crear la leyenda HTML
         legend_html = """
         <div style="position: fixed; 
-                    top: 15px; right: 10px; width: 90px; height: 100px; 
+                    top: 15px; right: 10px; width: 105px; height: 120px; 
                     background-color: white; border:2px solid black; 
                     z-index:9999; font-size:12px; padding: 8px; opacity: 0.7;">
             <i style="background-color:blue; width: 15px; height: 15px; display: inline-block;"></i> Apoyos<br>
             <i style="background-color:green; width: 15px; height: 15px; display: inline-block;"></i> Trafos<br>
             <i style="background-color:brown; width: 15px; height: 15px; display: inline-block;"></i> Switches<br>
             <i style="background-color:black; width: 15px; height: 15px; display: inline-block;"></i> Red MT<br>
+            <i style="background-color:red; width: 15px; height: 15px; display: inline-block;"></i> Vegetacion<br>
         </div>
         """
 
@@ -409,6 +414,10 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
             gradient=gradient_general
         ).add_to(mapa)
 
+        mapa_html = mapa._repr_html_()
+
+        return mapa_html
+
         '''
         # Diccionario para colores de los CircleMarker según nivel de riesgo
         riesgo_colores = {'Alto': 'red', 'Medio': 'orange', 'Bajo': 'yellow'}
@@ -490,23 +499,34 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
             puntos_verdes = eval(df['EQUIPOS_PUNTOS'].values[0]) 
             puntos_equipos.extend(puntos_verdes)
 
+        codes = [[], [], [], []]
+
         for _, row in redmt_seleccionado.iterrows():
             point1 = (row["LATITUD"], row["LONGITUD"])
             point2 = (row["LATITUD2"], row["LONGITUD2"])
-            color = 'black' if (point1 in nodos_aguas_abajo and point2 in nodos_aguas_abajo) else 'gray'
+            
+            if (point1 in nodos_aguas_abajo and point2 in nodos_aguas_abajo):
+                color = 'black'
+                codes[0].append(row['CODE']) 
+            else:
+                color = 'gray'
                
             folium.PolyLine(
                 [point1, point2],
                 color=color,
                 weight=3,
                 opacity=1.0,
-                popup=f"Connection ID: {row['CODE']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}, Latitud 2: {row['LATITUD2']}, Longitud 2: {row['LONGITUD2']}, ORDER: {row['ORDER_']}"
+                popup=f"Tramo de linea \n Material conductor: {row.MATERIALCONDUCTOR} \n Tipo conductor: {row.TIPOCONDUCTOR} \n Largo: {row.LENGTH} \n Calibre conductor: {row.CALIBRECONDUCTOR} \n Guarda conductor:{row.GUARDACONDUCTOR} \n Neutro conductor:{row.NEUTROCONDUCTOR} \n Calibre neutro:{row.CALIBRENEUTRO} \n Capacidad: {row.CAPACITY} \n Resistencia: {row.RESISTANCE:.4f} \n Acometida conductor: {row.ACOMETIDACONDUCTOR}"
             ).add_to(mapa)
 
         
         for _, row in trafos_seleccionado.iterrows():
             point1 = (row["LATITUD"], row["LONGITUD"])
-            color = 'green' if (point1 in puntos_equipos) else 'gray'
+            if (point1 in puntos_equipos):
+                color = 'green'
+                codes[1].append(row['CODE'])
+            else:
+                color = 'gray'
             folium.CircleMarker(
                 location=(row["LATITUD"], row["LONGITUD"]),
                 radius=5,
@@ -514,12 +534,16 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
                 fill=True,
                 fill_color=color,
                 fill_opacity=1.0,
-                popup=f"Point ID: {row['CODE']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}"
+                popup=f"Trafo Fase: {row.PHASES} \n Propietario: {row.OWNER1} \n Impedancia: {row.IMPEDANCE} \n Marca: {row.MARCA} \n Fecha fabricacion: {row.DATE_FAB[:10]} \n Tipo subestación: {row.TIPO_SUB} \n KVA: {row.KVA} \n KV1: {row.KV1}"
             ).add_to(mapa)
 
         for _, row in apoyos_seleccionado.iterrows():
             point1 = (row["LATITUD"], row["LONGITUD"])
-            color = 'blue' if (point1 in puntos_equipos) else 'gray'
+            if (point1 in puntos_equipos):
+                color = 'blue'
+                codes[2].append(row['CODE'])
+            else:
+                color = 'gray'
             folium.CircleMarker(
                 location=(row["LATITUD"], row["LONGITUD"]),
                 radius=5,
@@ -527,12 +551,16 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
                 fill=True,
                 fill_color=color,
                 fill_opacity=1.0,
-                popup=f"Point ID: {row['CODE']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}"
+                popup=f"Apoyo Propietario: {row.TOWNER} \n Tipo: {row.TIPO} \n Clase: {row.CLASE} \n Material: {row.MATERIAL} \n Longitud: {row.LONG_APOYO} \n Tierra pie: {row.TIERRA_PIE} \n Vientos: {row.VIENTOS}"
             ).add_to(mapa)
 
         for _, row in switches_seleccionado.iterrows():
             point1 = (row["LATITUD"], row["LONGITUD"])
-            color = 'purple' if (point1 in puntos_equipos) else 'gray'
+            if (point1 in puntos_equipos):
+                color = 'purple'
+                codes[3].append(row['CODE'])
+            else:
+                color = 'gray'
             folium.CircleMarker(
                 location=(row["LATITUD"], row["LONGITUD"]),
                 radius=5,
@@ -540,10 +568,10 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
                 fill=True,
                 fill_color=color,
                 fill_opacity=1.0,
-                popup=f"Point ID: {row['CODE']}, Latitud: {row['LATITUD']}, Longitud: {row['LONGITUD']}"
+                popup=f"Switche Fase: {row.PHASES} \n Codigo assembly: {row.ASSEMBLY} \n KV: {row.KV} \n Estado: {row.STATE}"
             ).add_to(mapa)
        
 
         mapa_html = mapa._repr_html_()
     
-    return mapa_html
+        return mapa_html, codes

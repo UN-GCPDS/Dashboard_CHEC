@@ -322,7 +322,7 @@ def create_layout():
                     'backgroundPosition': 'center',
                     'backgroundRepeat': 'no-repeat',
                 }),
-                html.Button(className='TabNet-Button',style={
+                html.Button(id='button-tab-net',className='TabNet-Button',style={
                     'width': '100%',
                     'height': '12%',
                     'marginTop': '9vh',
@@ -332,6 +332,7 @@ def create_layout():
                     'backgroundSize': '70%',
                     'backgroundPosition': 'center',
                     'backgroundRepeat': 'no-repeat',
+                    'cursor': 'pointer',
                 }),
                 dcc.Location(id='url-chat', refresh=True)
             ], style={

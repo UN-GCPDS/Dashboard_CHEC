@@ -6,7 +6,7 @@ import dash_bootstrap_components as dbc
 # Función que genera el contenido del espacio de trabajo
 def work_space():
 
-    with open("./options/criterias.json", "r", encoding='utf-8') as file:
+    with open("./options/criterias_1.json", "r", encoding='utf-8') as file:
         options_criterias = json.load(file)    
 
     # Puede ser un solo elemento o una lista de elementos
@@ -399,7 +399,7 @@ def create_layout():
                     'backgroundSize': '70%',
                     'backgroundPosition': 'center',
                     'backgroundRepeat': 'no-repeat',
-                    'cursor': 'pointer',
+                    
                 }),
                 html.Button(id='button-chat',className='Chat-Button',style={
                     'width': '100%',
@@ -411,8 +411,9 @@ def create_layout():
                     'backgroundSize': '70%',
                     'backgroundPosition': 'center',
                     'backgroundRepeat': 'no-repeat',
+                    'cursor': 'pointer',
                 }),
-                html.Button(className='TabNet-Button',style={
+                html.Button(id='button-tab-net',className='TabNet-Button',style={
                     'width': '100%',
                     'height': '12%',
                     'marginTop': '9vh',
@@ -422,6 +423,7 @@ def create_layout():
                     'backgroundSize': '70%',
                     'backgroundPosition': 'center',
                     'backgroundRepeat': 'no-repeat',
+                    'cursor': 'pointer',
                 }),
                 dcc.Location(id='url-graphs', refresh=True)
             ], style={

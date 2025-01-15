@@ -21,11 +21,14 @@ from app import app
 import maps_page
 import chat_page
 import graphs_page
+import tab_net_page
 
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     html.Div(id='page-content',style={'border': 'None'})
 ])
+
+app.config.suppress_callback_exceptions = True
 
 @app.callback(
     Output('page-content', 'children'),
@@ -36,6 +39,8 @@ def display_page(pathname):
         return chat_page.layout
     elif pathname == '/graphs_page':
         return graphs_page.layout
+    elif pathname == '/tab-net_page':
+        return tab_net_page.layout
     else:
         return maps_page.layout
 

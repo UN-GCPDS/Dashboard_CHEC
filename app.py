@@ -8,8 +8,6 @@ app = Dash(__name__, suppress_callback_exceptions=True, external_stylesheets=[
 with open("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/OPENAI_API_Key.txt", "r") as archivo:
         OPENAI_API_KEY = archivo.read()
 
-print(f"***OPENAI_API_KEY***: {OPENAI_API_KEY}")
-
 os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
 
 server = app.server

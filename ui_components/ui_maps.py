@@ -153,6 +153,7 @@ def work_space():
                                 'margin': '1vh 0px 0px 1.2%',
                                 
                             }),
+                    html.Div(id='select-evento', children=[])
                     ], 
             )
     ]
@@ -218,7 +219,6 @@ def create_layout():
                     'backgroundSize': '70%',
                     'backgroundPosition': 'center',
                     'backgroundRepeat': 'no-repeat',
-                    'cursor': 'pointer',
                 }),
                 html.Button(id='button-graphs',className='Graph-Button',style={
                     'width': '100%',
@@ -242,8 +242,9 @@ def create_layout():
                     'backgroundSize': '70%',
                     'backgroundPosition': 'center',
                     'backgroundRepeat': 'no-repeat',
+                    'cursor': 'pointer',
                 }),
-                html.Button(className='TabNet-Button',style={
+                html.Button(id='button-tab-net',className='TabNet-Button',style={
                     'width': '100%',
                     'height': '12%',
                     'marginTop': '9vh',
@@ -253,6 +254,7 @@ def create_layout():
                     'backgroundSize': '70%',
                     'backgroundPosition': 'center',
                     'backgroundRepeat': 'no-repeat',
+                    'cursor': 'pointer',
                 }),
                 dcc.Location(id='url-maps', refresh=True)
             ], style={

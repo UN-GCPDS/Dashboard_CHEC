@@ -184,22 +184,8 @@ def conversation(chat_id,query,model,procces):
 
             model="llama1"
 
-        
-        if data_equipo['Equipo'] == 'Apoyo':
 
-            response = recomendacion_apoyos(model, chat_id, data_equipo, query)
-
-        elif data_equipo['Equipo'] == 'Transformador':
-
-            response = recomendacion_transformadores(model, chat_id, data_equipo, query)
-
-        elif data_equipo['Equipo'] == 'Switches':
-
-            response = recomendacion_switches(model, chat_id, data_equipo, query)
-
-        elif data_equipo['Equipo'] == 'Tramo de red':
-
-            response = recomendacion_tramo_red(model, chat_id, data_equipo, query)
+        response = recomendacion(model, chat_id, data_equipo, query)
             
         return response, False
 
@@ -273,6 +259,276 @@ def conversation(chat_id,query,model,procces):
         
         
         return response, flag_image
+'''
+def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genérame la recomendación') -> str:
+
+
+    
+    template = """
+    Eres un experto técnico en infraestructura eléctrica. Tu objetivo es dar recomendaciones y pautas 
+    normativas basadas en el contexto que se te proporciona. 
+
+    Instrucciones para tu respuesta:
+    1. Identifica las variables y sus valores que menciona el usuario.
+    2. Revisa el contexto normativo y la información histórica (chat_history) para entender las normas 
+    o límites aplicables.
+    3. Compara cada valor de la variable con las normas del contexto, explicando si cumple o no cumple. 
+    - Si no cumple, explica el riesgo o la consecuencia y brinda recomendaciones claras y accionables 
+        (qué cambiar, qué revisar, qué reforzar, etc.).
+    - Si cumple, explica por qué cumple y qué se debe tener en cuenta a futuro (mantenimiento, 
+        límites de uso, etc.).
+    4. Redacta tu respuesta en un tono claro, pero conversacional y cercano, sin usar una lista demasiado 
+    rígida. Estructura el texto en párrafos o viñetas libres para que sea más fácil de entender.
+    5. Si existe ambigüedad o falta de información, explica qué información adicional sería necesaria 
+    para dar una recomendación más completa.
+
+    Usa el siguiente contexto y el historial de la conversación para redactar la recomendación:
+
+    {context}
+
+    {chat_history}
+
+    Human: {human_input}
+
+    Chatbot (RESPUESTA RECOMENDACIÓN):
+    """
+
+    
+    prompt = PromptTemplate(
+        input_variables=["chat_history", "human_input", "context"], template=template
+    )
+
+
+    memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+
+    if model=="gpt":
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    elif model=="llama1":
+        llm_chat=ChatOllama(model="llama3.1",temperature=0)
+    elif model=="llama2":
+        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
+
+    
+    chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
+
+    # Load the chat history of the conversation for every particular agent
+    path_memory=f"memories/{chat_id}.pkl"
+    
+    
+    if os.path.exists(path_memory):
+        with open(path_memory, 'rb') as f:
+            memory = pickle.load(f) #memory of the conversation
+        
+        chain.memory=memory
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
+    responses=[]
+    docs_all=[]
+    for muestra in info_poligono.keys():
+        tipo_equipo=info_poligono[muestra]["Tipo_de_equipo"]
+        variables_recomendacion=pd.read_excel(f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_{tipo_equipo}.xlsx")
+        docs=[]
+        for variable in info_poligono[muestra]["top_5"].keys():
+            try:
+                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento "].iloc[0]
+            except:
+                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento"].iloc[0]
+            sugerencia=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Sugerencia"].iloc[0]
+            seccion_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Normativa"].iloc[0]
+            valor_variable=info_poligono[muestra]["top_5"][variable]
+            # load from disk
+            vectorstore = Chroma(persist_directory=f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/Dashboard_CHEC/embeddings_by_procces/{documento_buscar}",embedding_function=embeddings)
+            query=sugerencia+" "+seccion_buscar
+
+            docs_variable=vectorstore.similarity_search(query,k=5) #Retriever
+            docs=docs+docs_variable
+
+            query=f"Genéramen una recomendación para la variable {variable}, la cual tiene un valor de {valor_variable}. {sugerencia}"
+
+            response_all=chain({"input_documents": docs_variable, "human_input": query, "chat_history":memory}, #,"sugerencia":sugerencia},
+                    return_only_outputs=False) #AI answer
+    
+
+            response=response_all['output_text']
+            responses.append(response)
+        
+        
+
+        docs_all=docs_all+docs
+
+    
+
+        
+    #Save the chat history (memory) for a new iteration of the conversation for the general agent:
+    with open(path_memory, 'wb') as f:
+        pickle.dump(chain.memory, f)
+
+    
+
+    if human_input == 'Genérame la recomendación':
+        consolidar_prompt = f"""
+        A continuación tienes una lista de recomendaciones parciales generadas 
+        para diferentes variables. Tu tarea es integrarlas en un solo texto con 
+        un hilo narrativo cohesivo, tomando en cuenta el tono conversacional y 
+        la claridad requerida para un informe técnico.
+
+        Lista de recomendaciones parciales:
+        {chr(10).join(f"- {rec}" for rec in responses)}
+
+        Ahora, por favor, redacta un texto final único que integre todas 
+        estas recomendaciones de manera fluida y coherente, usando un tono 
+        claro y cercano, y respetando las pautas normativas y técnicas 
+        cuando corresponda.
+        """
+
+        # Realizamos la llamada final al LLM
+        consolidated_response = chain(
+            {
+                "input_documents": [],  # No requerimos documentos aquí
+                "human_input": consolidar_prompt,
+                "chat_history": chain.memory
+            },
+            return_only_outputs=False
+        )
+
+        # Este es el texto único que regresa el LLM, integrando todas las recomendaciones.
+        final_response = consolidated_response["output_text"]
+    else:
+        query=human_input
+        final_response==chain({"input_documents": docs_all, "human_input": query, "chat_history":memory}, #,"sugerencia":sugerencia},
+                    return_only_outputs=False) #AI answer
+        
+
+        
+    return final_response
+'''
+
+def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genérame la recomendación') -> str:
+
+    template = """
+    Eres un experto técnico en infraestructura eléctrica. Tu objetivo es dar recomendaciones y pautas 
+    normativas basadas en el contexto que se te proporciona. 
+
+    Instrucciones para tu respuesta:
+    1. Identifica las variables y sus valores que menciona el usuario.
+    2. Revisa el contexto normativo y la información histórica (chat_history) para entender las normas 
+    o límites aplicables.
+    3. Compara cada valor de la variable con las normas del contexto, explicando si cumple o no cumple. 
+    - Si no cumple, explica el riesgo o la consecuencia y brinda recomendaciones claras y accionables 
+        (qué cambiar, qué revisar, qué reforzar, etc.). Además dar siempre una sugerencia de la normativa a la que se debe 
+        ajustar y el valor al que se debe ajustar.
+    - Si cumple, explica por qué cumple y qué se debe tener en cuenta a futuro (mantenimiento, 
+        límites de uso, etc.).
+    4. Dar siempre una sugerencia de la normativa a la que se debe ajustar la variable.
+    5. Dar siempre explicitamente el valor al que se debe ajustar la variable o el rango de valores en el que debe estar.
+    6. Redacta tu respuesta en un tono claro, pero conversacional y cercano, sin usar una lista demasiado 
+    rígida. Estructura el texto en párrafos o viñetas libres para que sea más fácil de entender.
+    7. Si existe ambigüedad o falta de información, explica qué información adicional sería necesaria 
+    para dar una recomendación más completa.
+
+    Usa el siguiente contexto y el historial de la conversación para redactar la recomendación:
+
+    {context}
+
+    {chat_history}
+
+    Human: {human_input}
+
+    Chatbot (RESPUESTA RECOMENDACIÓN UN SOLO PÁRRAFO):
+    """
+
+    
+    prompt = PromptTemplate(
+        input_variables=["chat_history", "human_input", "context"], template=template
+    )
+
+
+    if model=="gpt":
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    elif model=="llama1":
+        llm_chat=ChatOllama(model="llama3.1",temperature=0)
+    elif model=="llama2":
+        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
+
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
+    responses=[]
+    docs_all=[]
+    for muestra in info_poligono.keys():
+        memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+        chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
+        # Load the chat history of the conversation for every particular agent
+        path_memory=f"memories/{chat_id}.pkl"
+        
+        '''if os.path.exists(path_memory):
+            with open(path_memory, 'rb') as f:
+                memory = pickle.load(f) #memory of the conversation
+            
+            chain.memory=memory'''
+        tipo_equipo=info_poligono[muestra]["Tipo_de_equipo"]
+        variables_recomendacion=pd.read_excel(f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_{tipo_equipo}.xlsx")
+        docs=[]
+        partes=[]
+        for variable in info_poligono[muestra]["top_5"].keys():
+            memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+            try:
+                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento "].iloc[0]
+            except:
+                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento"].iloc[0]
+            sugerencia=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Sugerencia"].iloc[0]
+            seccion_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Normativa"].iloc[0]
+            valor_variable=info_poligono[muestra]["top_5"][variable]
+            # load from disk
+            vectorstore = Chroma(persist_directory=f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/Dashboard_CHEC/embeddings_by_procces/{documento_buscar}",embedding_function=embeddings)
+            query=sugerencia+" "+seccion_buscar
+
+            docs_variable=vectorstore.similarity_search(query,k=5) #Retriever
+            docs=docs+docs_variable
+
+            query=f"Generame una recomendación para la variable {variable}, la cual tiene un valor de {valor_variable}. {sugerencia}"
+
+            response=chain({"input_documents": docs, "human_input": query, "chat_history":memory}, #,"sugerencia":sugerencia},
+                    return_only_outputs=False) #AI answer
+
+            response = response['output_text']
+
+            responses.append(response)
+        
+
+        docs_all=docs_all+docs
+
+        
+        #Save the chat history (memory) for a new iteration of the conversation for the general agent:
+        with open(path_memory, 'wb') as f:
+            pickle.dump(chain.memory, f)
+
+
+        with open("answer.pkl", 'wb') as archivo:
+            pickle.dump(response, archivo)
+    
+    final_recommendation = "A continuación, se muestran las recomendaciones para cada equipo:\n\n"
+    print(type(info_poligono))
+    print(info_poligono)
+    print(list(info_poligono.keys()))
+    for idx, resp in enumerate(responses, start=0):
+        print(idx, idx/5)
+        if (idx==0 or idx==5 or idx==10):
+          final_recommendation += "\n"
+          final_recommendation += f"RECOMENDACIÓN PARA LAS VARIABLES DEL EQUIPO {info_poligono[list(info_poligono.keys())[int(idx/5)]]['Tipo_de_equipo'].upper()} CON ID {list(info_poligono.keys())[int(idx/5)]}: \n\n{resp}\n"
+        else:
+          final_recommendation+=f"\n{resp}\n"
+
+
+    if human_input == 'Genérame la recomendación':
+        final_response=final_recommendation
+    else:
+        query=human_input
+        final_response==chain({"input_documents": docs_all, "human_input": query, "chat_history":memory}, #,"sugerencia":sugerencia},
+                    return_only_outputs=False) #AI answer
+        
+    print(final_response)
+        
+    return final_response
 
 
 def recomendacion_apoyos(model:str, chat_id:str,data_equipo:dict,human_input='Genérame la recomendación') -> str:
@@ -746,21 +1002,7 @@ def get_recommendations(data_equipo):
     last_message=mensajes[-1]
     mensaje_usuario=last_message["texto"]
 
-    if data_equipo['Equipo'] == 'Apoyo':
-
-        respuesta_asistente = {'autor': 'Asistente', 'texto': recomendacion_apoyos('gpt', chat_id, data_equipo)}
-
-    elif data_equipo['Equipo'] == 'Transformador':
-
-        respuesta_asistente = {'autor': 'Asistente', 'texto': recomendacion_transformadores('gpt', chat_id, data_equipo)}
-
-    elif data_equipo['Equipo'] == 'Switches':
-
-        respuesta_asistente = {'autor': 'Asistente', 'texto': recomendacion_switches('gpt', chat_id, data_equipo)}
-
-    elif data_equipo['Equipo'] == 'Tramo de red':
-
-        respuesta_asistente = {'autor': 'Asistente', 'texto': recomendacion_tramo_red('gpt', chat_id, data_equipo)}
+    respuesta_asistente = {'autor': 'Asistente', 'texto': recomendacion('gpt', chat_id, data_equipo)}
 
     data['chats'][chat_id]['mensajes'].append(respuesta_asistente)
 
