@@ -153,7 +153,8 @@ def work_space():
                                 'margin': '1vh 0px 0px 1.2%',
                                 
                             }),
-                    html.Div(id='select-evento', children=[])
+                    html.Div(id='select-evento', children=[]),
+                    html.Div(id='recomendacion-button', children=[]),
                     ], 
             )
     ]

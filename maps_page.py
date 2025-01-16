@@ -1,3 +1,4 @@
+import os
 import gc
 import json
 from app import app
@@ -78,6 +79,8 @@ layout.children[1]['cond-env-container'].children = dcc.Dropdown(
                        'font-family': 'DM Sans !important' ,
                        'font-size': '20px'},
                 )
+
+
 
 
 '''criticidad_data = None'''
@@ -440,6 +443,7 @@ def handle_url_update(select_evento_clicks, n_clicks_chat, n_clicks_graphs, n_cl
         if (select_evento_clicks != evento_id) and (select_evento_clicks != None):
             evento_id = select_evento_clicks
             return "/chat_page"  # Cambia esto al pathname correspondiente
+        
 
     # Lógica para los botones
     if triggered_id == 'button-chat' and n_clicks_chat:
