@@ -56,24 +56,24 @@ def my_r2_score_fn(y_pred, y_true):
     r2_score = 1 - (unexplained_variance / total_variance)
     return r2_score
 
+# Clase personalizada para TabNetRegressor
 class CustomTabNetRegressor(TabNetRegressor):
     def __init__(self, *args, **kwargs):
         super(CustomTabNetRegressor, self).__init__(*args, **kwargs)
-        self.network = self.network.to('cpu')
 
     def forward(self, X):
-        X = X.to('cpu')
         output, M_loss = self.network(X)
         output = torch.relu(output)
         return output, M_loss
 
     def predict(self, X):
+        device = next(self.network.parameters()).device
         if not isinstance(X, torch.Tensor):
             X = torch.tensor(X, dtype=torch.float32)
-        X = X.to('cpu')
+        X = X.to(device)
         with torch.no_grad():
             output, _ = self.forward(X)
-        return output.numpy()
+        return output.cpu().numpy()
 
 # Parámetros
 par = {
@@ -390,7 +390,7 @@ def load_data():
     with open("./options/criterias_2.json", "w") as f:
         json.dump(options, f)
 
-    loaded_clf = torch.load("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/model.pth", map_location=torch.device('cpu'))
+    loaded_clf = torch.load("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/model.pth")
 
     return trafos, apoyos, switches, redmt, super_eventos, descargas, vegetacion, df, df1, label_encoders, scolumns, NUMERIC_COLUMNS, max_values, loaded_clf
 
@@ -982,7 +982,7 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
         df_2 = super_eventos_seleccionado[super_eventos_seleccionado['evento'] == evento]
         polygon_puntos = eval(df_2['PUNTOS_POLIGONO'].values[0])
         # Dibuja el polígono en el mapa
-        match df['NIVEL_C'].values[0]:
+        match df_2['NIVEL_C'].values[0]:
             case 0:
                 color = 'yellow'
             case 1:
@@ -1038,7 +1038,7 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
 
         # Comprobar si se encontró el resultado
         if not resultado.empty:
-            radio = resultado.values[0]
+            radio = float(resultado.iloc[0]) 
 
         folium.CircleMarker(
             location=(row["LATITUD"], row["LONGITUD"]),
@@ -1062,7 +1062,7 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
 
         # Comprobar si se encontró el resultado
         if not resultado.empty:
-            radio = resultado.values[0]
+            radio = float(resultado.iloc[0]) 
 
         folium.CircleMarker(
             location=(row["LATITUD"], row["LONGITUD"]),
@@ -1086,8 +1086,7 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
 
         # Comprobar si se encontró el resultado
         if not resultado.empty:
-            radio = resultado.values[0]
-
+            radio = float(resultado.iloc[0]) 
 
         folium.CircleMarker(
             location=(row["LATITUD"], row["LONGITUD"]),

@@ -81,19 +81,16 @@ layout.children[1]['cond-env-container'].children = dcc.Dropdown(
                        'font-size': '20px'},
                 )
 
-
-
-
 criticidad_data = None
-criticidad_data = {"B2927":{
+'''criticidad_data = {"B38003":{
                     "Tipo_de_equipo":"apoyo",
-                    "top_5": {'KVNOM': "33", 'MATERIALCONDUCTOR': "ACSR", 'CALIBRECONDUCTOR': "2", 'VELOCIDAD_VIENTO': "1.2", 'TEMPERATURA': "20"}},
-                    "B65026":{
+                    "top_5": {'MATERIAL': "Poste metálico", 'TEMPERATURA': '29.7', 'LONG_APOYO': "15.0", 'TIERRA_PIE': "T", 'VIENTO': "5.0"}},
+                    "E31437":{
                     "Tipo_de_equipo":"apoyo",
-                    "top_5": {'MATERIAL': "Poste en Concreto", 'LONG_APOYO': "8.0", 'TIERRA_PIE': "T", 'VIENTO': "1.2", 'TEMPERATURA': "18.0"}},
-                    "L18033":{
+                    "top_5": {'MATERIAL': "Riel", 'TEMPERATURA': '29.3', 'LONG_APOYO': "9.0", 'TIERRA_PIE': "T", 'VIENTO': "3.0"}},
+                    "B38007":{
                     "Tipo_de_equipo": "apoyo",
-                    "top_5": {'MATERIAL': "Torrecilla Metálica Triangular", 'LONG_APOYO': "10.0", 'TIERRA_PIE': "T", 'VIENTO': "1.2", 'TEMPERATURA': "14.0"}}}
+                    "top_5": {'MATERIAL': "Poste en Concreto", 'TEMPERATURA': '30.1', 'LONG_APOYO': "12.0", 'TIERRA_PIE': "T", 'VIENTO': "1.0"}}}'''
 
 '''criticidad_data = {'Equipo':'Apoyo',
                    'Variable_Valores': {'MATERIAL': 'Torrecilla metalica', 
