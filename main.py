@@ -17,54 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from folium.plugins import MarkerCluster
 from shapely.geometry import Point, Polygon, MultiPoint
-
-
-'''# Ruta a la carpeta donde están los archivos
-carpeta = './memories'
-
-# Listar todos los archivos en la carpeta
-archivos = os.listdir(carpeta)
-
-# Iterar sobre los archivos
-for archivo in archivos:
-    # Verificar si no es 'chat-0.pkl'
-    if archivo != 'chat-0.pkl' and archivo.startswith('chat-') and archivo.endswith('.pkl'):
-        # Construir la ruta completa al archivo
-        ruta_archivo = os.path.join(carpeta, archivo)
-        # Eliminar el archivo
-        os.remove(ruta_archivo)
-        print(f"Eliminado: {ruta_archivo}")
-
-os.remove('chat_data.json')
-
-# Datos a escribir en el archivo JSON
-chat_data = {
-    "chats": {
-        "chat-0": {
-            "nombre": "chat-0",
-            "mensajes": [
-                {
-                    "autor": "Tú",
-                    "texto": "",
-                    "needs_response": False,
-                    "modelo": "gpt",
-                    "proceso": "recomendacion"
-                },
-                {
-                    "autor": "Asistente",
-                    "texto": "Hola, soy un asistente para ayudarte con tus consultas. ¿En qué puedo ayudarte hoy?"
-                }
-            ],
-            "files": []
-        }
-    },
-    "current_chat_id": "chat-0"
-}
-
-with open('chat_data.json', 'w', encoding='utf-8') as f:
-    json.dump(chat_data, f, indent=4, ensure_ascii=False)
-
-print("Datos de la sesión anterior con el chat limpiados.")'''
+from utils.maps_functions import get_labels, my_mse_loss_fn, my_rmse_loss_fn, my_mae_loss_fn, my_mape_loss_fn, my_r2_score_fn, CustomTabNetRegressor
 
 
 from app import app

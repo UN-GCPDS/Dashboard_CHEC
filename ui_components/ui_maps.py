@@ -154,6 +154,7 @@ def work_space():
                                 
                             }),
                     html.Div(id='select-evento', children=[]),
+                    html.Div(id='equipos-criticos-button', children=[]),
                     html.Div(id='recomendacion-button', children=[]),
                     ], 
             )

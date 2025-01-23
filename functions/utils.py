@@ -25,6 +25,7 @@ from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe
 from langchain_openai import OpenAI
 import time
 import shutil 
+from pyvis.network import Network
 
 import maps_page
 
@@ -403,6 +404,125 @@ def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genéra
     return final_response
 '''
 
+def get_structure_graph_recomendation(info_poligono):
+    variables_por_equipo={}
+    normativas_por_equipo={}
+    documentos_por_equipo={}
+    sugerencias_por_equipo={}
+    ids_equipos=list(info_poligono.keys())
+    for id in ids_equipos:
+        tipo_equipo=info_poligono[id]["Tipo_de_equipo"]
+        variables_recomendacion=pd.read_excel(f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_{tipo_equipo}.xlsx")
+        variables_por_equipo[tipo_equipo+"_"+id]=[]
+        normativas_por_equipo[tipo_equipo+"_"+id]={}
+        documentos_por_equipo[tipo_equipo+"_"+id]={}
+        sugerencias_por_equipo[tipo_equipo+"_"+id]={}
+        variables=list(info_poligono[id]["top_5"].keys())
+        variables_id = [elemento + "_"+ id for elemento in variables]
+        for i,var in enumerate(variables):
+            valor=info_poligono[id]["top_5"][var]
+            try:
+                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==var]["Documento "].iloc[0]
+            except:
+                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==var]["Documento"].iloc[0]
+            sugerencia=variables_recomendacion[variables_recomendacion["Variables"]==var]["Sugerencia"].iloc[0]
+            seccion_buscar=variables_recomendacion[variables_recomendacion["Variables"]==var]["Normativa"].iloc[0]
+            description_var=variables_recomendacion[variables_recomendacion["Variables"]==var]["Descripción"].iloc[0]
+            
+            variables_por_equipo[tipo_equipo+"_"+id].append({"nombre":variables_id[i],"descripcion":description_var,"valor":valor})
+            normativas_por_equipo[tipo_equipo+"_"+id][variables_id[i]]={"id": "norm"+var+"_"+id, "descripcion": seccion_buscar}
+            documentos_por_equipo[tipo_equipo+"_"+id][variables_id[i]]={"id": "doc"+var+"_"+id, "nombre": documento_buscar}
+            sugerencias_por_equipo[tipo_equipo+"_"+id][variables_id[i]]={"id": "sug"+var+"_"+id, "descripcion": sugerencia}
+
+    return variables_por_equipo, normativas_por_equipo, documentos_por_equipo, sugerencias_por_equipo
+
+def get_html_graph_recomendation(variables_por_equipo,normativas_por_equipo,documentos_por_equipo,sugerencias_por_equipo,chat_id):
+    # Inicializar la red PyVis con fondo blanco y texto en negro
+    net = Network(height="750px", width="100%", bgcolor="white", font_color="black")
+
+    # --- Definición de paleta de colores ---
+    color_equipo = "#4caf50"            # Verde medio para equipos
+    color_variable = "#9e9e9e"          # Gris para variables
+    color_normativa = "#2e7d32"         # Verde oscuro para normativas
+    color_documento = "#757575"         # Gris medio oscuro para documentos
+    color_sugerencia = "#81c784"        # Verde claro para sugerencias
+
+    # --- Construcción del grafo ---
+    for equipo_id, vars_lista in variables_por_equipo.items():
+        # Agregar nodo de equipo con color verde
+        net.add_node(equipo_id, label=equipo_id, shape="ellipse", color=color_equipo, 
+                    title=f"Equipo: {equipo_id}")
+
+        # Procesar cada variable del equipo
+        for var in vars_lista:
+            var_nombre = var["nombre"]
+            
+            # Verificar si el nodo de la variable ya existe
+            nodos_actuales = [n["id"] for n in net.nodes]
+            if var_nombre not in nodos_actuales:
+                net.add_node(var_nombre, label=var_nombre, shape="box", color=color_variable,
+                            title=f"{var['descripcion']}\nValor: {var['valor']}")
+            
+            # Relacionar equipo con variable
+            net.add_edge(equipo_id, var_nombre, title="Tiene Variable Crítica",label="Tiene Variable Crítica")
+            
+            # Asociar normativa
+            norm_info = normativas_por_equipo.get(equipo_id, {}).get(var_nombre)
+            if norm_info:
+                norm_id = norm_info["id"]
+                # Verificar si el nodo de la normativa ya existe
+                if norm_id not in [n["id"] for n in net.nodes]:
+                    net.add_node(norm_id, label="Normativa", shape="diamond", color=color_normativa, 
+                                title=norm_info["descripcion"])
+                net.add_edge(var_nombre, norm_id, title="Regulado por",label="Regulado por")
+
+                # Asociar documento a la normativa
+                doc_info = documentos_por_equipo.get(equipo_id, {}).get(var_nombre)
+                if doc_info:
+                    doc_id = doc_info["id"]
+                    if doc_id not in [n["id"] for n in net.nodes]:
+                        net.add_node(doc_id, label=doc_info["nombre"], shape="database", color=color_documento, 
+                                    title=f"Documento: {doc_info['nombre']}")
+                    net.add_edge(norm_id, doc_id, title="Documentado en", label="Documentado en")
+            
+            # Asociar sugerencia a la variable
+            sug_info = sugerencias_por_equipo.get(equipo_id, {}).get(var_nombre)
+            if sug_info:
+                sug_id = sug_info["id"]
+                if sug_id not in [n["id"] for n in net.nodes]:
+                    net.add_node(sug_id, label="Sugerencia", shape="star", color=color_sugerencia, 
+                                title=sug_info["descripcion"])
+                net.add_edge(var_nombre, sug_id, title="con sugerencia",label="con sugerencia")
+
+    # --- Configuración de física y opciones ---
+    net.force_atlas_2based()  # Opcional, para un layout específico
+    net.set_options("""
+    var options = {
+    "nodes": {
+        "font": {
+        "size": 16
+        }
+    },
+    "edges": {
+        "color": {
+        "inherit": true
+        },
+        "smooth": false
+    },
+    "physics": {
+        "barnesHut": {
+        "gravitationalConstant": -80000,
+        "springLength": 250
+        },
+        "minVelocity": 0.75
+    }
+    }
+    """)
+
+    # --- Generar y guardar el grafo en un archivo HTML ---
+    net.write_html(f"./grafos_recomendacion/Flow_recomendation_{chat_id}.html")
+
+
 def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genérame la recomendación') -> str:
 
     template = """
@@ -520,6 +640,8 @@ def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genéra
 
 
     if human_input == 'Genérame la recomendación':
+        variables_por_equipo, normativas_por_equipo, documentos_por_equipo, sugerencias_por_equipo = get_structure_graph_recomendation(info_poligono)
+        get_html_graph_recomendation(variables_por_equipo,normativas_por_equipo,documentos_por_equipo,sugerencias_por_equipo,chat_id)
         final_response=final_recommendation
     else:
         query=human_input

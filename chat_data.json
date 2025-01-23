@@ -16,7 +16,46 @@
                 }
             ],
             "files": []
+        },
+        "chat-1": {
+            "nombre": "chat-1",
+            "mensajes": [
+                {
+                    "autor": "Tú",
+                    "texto": "",
+                    "needs_response": true,
+                    "modelo": "gpt",
+                    "proceso": "recomendacion"
+                }
+            ],
+            "files": []
+        },
+        "chat-2": {
+            "nombre": "chat-2",
+            "mensajes": [
+                {
+                    "autor": "Tú",
+                    "texto": "",
+                    "needs_response": true,
+                    "modelo": "gpt",
+                    "proceso": "recomendacion"
+                }
+            ],
+            "files": []
+        },
+        "chat-3": {
+            "nombre": "chat-3",
+            "mensajes": [
+                {
+                    "autor": "Tú",
+                    "texto": "",
+                    "needs_response": true,
+                    "modelo": "gpt",
+                    "proceso": "recomendacion"
+                }
+            ],
+            "files": []
         }
     },
-    "current_chat_id": "chat-0"
+    "current_chat_id": "chat-3"
 }

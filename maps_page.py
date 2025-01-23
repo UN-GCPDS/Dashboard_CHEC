@@ -9,7 +9,7 @@ from dash import callback_context, exceptions
 from dash import Dash, html, dcc, Output, Input, State, ctx
 import dash_bootstrap_components as dbc
 from ui_components.ui_maps import create_layout
-from utils.maps_functions import select_data, load_data, map_folium
+from utils.maps_functions import select_data, load_data, map_folium, enumerate_repeated_from_startup, map_folium_2
 from functions.utils import obtener_clave_maximo_score
 
 with open("./options/cond_env.json", "r", encoding='utf-8') as file:
@@ -23,10 +23,12 @@ total_data = load_data()  # type: ignore
 click_count = 0
 div_content = None
 data_frame = None
-day = None
+day = 1
 map_frame = None
 condition = None
 count_clicks = -1
+
+click_count_1 = 0
 
 options_dates =  sorted(total_data[0].FECHA.unique())
 options_dates = [date.strftime('%Y-%m') for date in options_dates]
@@ -36,7 +38,6 @@ options_municipios = sorted(total_data[0].MUN.unique())
 options_eventos = ['']
 options_tipo_equipo = ['']
 options_equipos = ['']
-codes = None
 evento_id = None
 tipo_equipo_id = None
 equipo_id = None
@@ -83,9 +84,9 @@ layout.children[1]['cond-env-container'].children = dcc.Dropdown(
 
 
 
-'''criticidad_data = None'''
+criticidad_data = None
 criticidad_data = {"B2927":{
-                    "Tipo_de_equipo":"tramo_red",
+                    "Tipo_de_equipo":"apoyo",
                     "top_5": {'KVNOM': "33", 'MATERIALCONDUCTOR': "ACSR", 'CALIBRECONDUCTOR': "2", 'VELOCIDAD_VIENTO': "1.2", 'TEMPERATURA': "20"}},
                     "B65026":{
                     "Tipo_de_equipo":"apoyo",
@@ -134,7 +135,7 @@ criticidad_data['Variable_Recomendacion'] = obtener_clave_maximo_score(criticida
     State('map-container', 'children')
 )
 def initialize_map(selected_date, selected_municipios, selected_env_condition, n_clicks, current_map_content):
-    global click_count, data_frame, day, condition, options_eventos, options_tipo_equipo, options_equipos, codes
+    global click_count, data_frame, day, condition, options_eventos, dict_options, options_tipo_equipo, options_equipos
     condition = selected_env_condition
     if (n_clicks > click_count) & (condition != 'CRITICIDAD'):
         click_count = n_clicks
@@ -216,14 +217,18 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
         click_count = n_clicks
         data_frame = select_data(
             int(selected_date[:4]), int(selected_date[5:7]), selected_municipios,
-            total_data[0], total_data[1], total_data[2], total_data[3], total_data[4], total_data[5], total_data[6]
+            total_data[0], total_data[1], total_data[2], total_data[3], total_data[4], total_data[5], total_data[6], total_data[8]
         )
-        folium_map, codes = map_folium(
+        folium_map = map_folium(
             data_frame[0], data_frame[1], data_frame[2], data_frame[3],
             data_frame[4][0], data_frame[5][0], data_frame[6][0],condition
         )
 
-        options_eventos = sorted(data_frame[4][0]['evento'].unique())
+        options_eventos = list(data_frame[7][day-1]['evento'])
+        options_eventos = enumerate_repeated_from_startup(options_eventos)
+        index_eventos = list(data_frame[7][day-1]['evento'].index)
+        dict_options = dict(zip(options_eventos, index_eventos))
+        
 
         # Create the map and slider
         map_frame = html.Iframe(
@@ -340,6 +345,21 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
                                     'zIndex': '850',},
                                 )
                             ]),
+                            html.Button('Equipos críticos', id='equipos-criticos-button',className='equipos-criticos-button', style={
+                                        'fontFamily': "'DM Sans', sans-serif",
+                                        'fontSize': '16px',
+                                        'fontWeight': '700',
+                                        'color': 'black',
+                                        'cursor': 'pointer',
+                                        'borderRadius': '3px',
+                                        'borderColor': 'white',
+                                        'width': '82%',
+                                        'height': '8%',
+                                        'backgroundColor': '#11BB52CF',
+                                        'position': 'relative',
+                                        'zIndex': '350',
+                                        'margin': '4vh 0 0 0',
+                                    }, n_clicks=0),
                             html.Button('Recomendación', id='recomendacion-button',className='recomendacion-button', style={
                                         'fontFamily': "'DM Sans', sans-serif",
                                         'fontSize': '16px',
@@ -370,7 +390,34 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
         return div_content
     return dash.no_update
 
-# Second callback to update the map when the slider changes
+@app.callback(
+        Output('recomendacion-button', 'children'),
+        Input('select-evento', 'value'))
+def update_evento(evento_value):
+    global evento_id
+    if evento_value != evento_id:
+        print('Entró')
+        evento_id = evento_value
+    return dash.no_update
+
+'''@app.callback(
+        Output('folium_map_frame', 'srcDoc'),
+        Input('equipos-criticos-button', 'n_clicks'))
+
+def update_equipos_criticos(n_clicks):
+    global click_count_1
+    if (n_clicks > click_count_1) & (condition == 'CRITICIDAD') & (evento_id != None  | evento_id != ''):
+        click_count_1 = n_clicks
+        map = map_folium_2(data_frame[0], data_frame[1], data_frame[2], data_frame[3],
+            data_frame[4][day-1], dict_options[evento_id],total_data[7], total_data[8], total_data[9], 
+            total_data[10], total_data[13])
+        return map
+    else: 
+        return dash.no_update
+
+
+
+# Second callback to update the map  when the slider changes
 @app.callback(
     [Output('date-slider', 'value'), 
      Output('folium_map_frame', 'srcDoc'), 
@@ -391,7 +438,7 @@ def update_slider_and_map(decrease_clicks, increase_clicks, slider_value, slider
     elif triggered_id == "increase-btn" and slider_value < slider_max:
         slider_value += 1
 
-    global day, data_frame, condition, options_eventos, codes
+    global day, data_frame, condition, options_eventos, dict_options
     
     # Si no hay cambio en el slider
     if slider_value == day:
@@ -401,21 +448,73 @@ def update_slider_and_map(decrease_clicks, increase_clicks, slider_value, slider
     print(f'Value:{day}')
 
     if condition == 'CRITICIDAD':
-        folium_map, codes = map_folium(
+        folium_map = map_folium(
             data_frame[0], data_frame[1], data_frame[2], data_frame[3],
             data_frame[4][day-1], data_frame[5][day-1], data_frame[6][day-1], condition
         )
-        options_eventos = sorted(data_frame[4][day-1]['evento'].unique())
-        return slider_value, folium_map, [{'label': opt, 'value': opt} for opt in options_eventos]
+        options_eventos = list(data_frame[7][day-1]['evento'])
+        index_eventos = list(data_frame[7][day-1]['evento'].index)
+        dict_options = dict(zip(options_eventos, index_eventos))
+        options_eventos = enumerate_repeated_from_startup(options_eventos)
+        return slider_value, folium_map, options_eventos
     else:
         folium_map = map_folium(
             data_frame[0], data_frame[1], data_frame[2], data_frame[3],
             data_frame[4][day-1], data_frame[5][day-1], data_frame[6][day-1], condition
         )
         
-        return slider_value, folium_map, dash.no_update
+        return slider_value, folium_map, dash.no_update'''
 
-    return slider_value, dash.no_update, dash.no_update
+@app.callback(
+    [Output('date-slider', 'value'), 
+     Output('folium_map_frame', 'srcDoc'), 
+     Output('select-evento', 'options')],
+    [Input('decrease-btn', 'n_clicks'),
+     Input('increase-btn', 'n_clicks'),
+     Input('date-slider', 'value'),
+     Input('equipos-criticos-button', 'n_clicks')],
+    [State('date-slider', 'min'),
+     State('date-slider', 'max')]
+)
+def update_maps_and_slider(decrease_clicks, increase_clicks, slider_value, equipos_clicks, slider_min, slider_max):
+    global day, data_frame, condition, options_eventos, dict_options, click_count_1, evento_id
+    
+    triggered_id = ctx.triggered_id
+    
+    if triggered_id == "equipos-criticos-button":
+        print('Entró 2', evento_id,'\n', dict_options)
+        if (equipos_clicks > click_count_1) and (condition == 'CRITICIDAD') and (evento_id is not None and evento_id != ''):
+            click_count_1 = equipos_clicks
+            map = map_folium_2(data_frame[0], data_frame[1], data_frame[2], data_frame[3],
+                data_frame[4][day-1], dict_options[evento_id], total_data[7], total_data[8], 
+                total_data[9], total_data[10], total_data[11],total_data[12],total_data[13])
+            return dash.no_update, map, dash.no_update
+    
+    decrease_clicks = decrease_clicks or 0
+    increase_clicks = increase_clicks or 0
+
+    if triggered_id == "decrease-btn" and slider_value > slider_min:
+        slider_value -= 1
+    elif triggered_id == "increase-btn" and slider_value < slider_max:
+        slider_value += 1
+    
+    if slider_value == day:
+        return slider_value, dash.no_update, dash.no_update
+
+    day = slider_value
+
+    if condition == 'CRITICIDAD':
+        folium_map = map_folium(data_frame[0], data_frame[1], data_frame[2], data_frame[3],
+            data_frame[4][day-1], data_frame[5][day-1], data_frame[6][day-1], condition)
+        options_eventos = list(data_frame[7][day-1]['evento'])
+        options_eventos = enumerate_repeated_from_startup(options_eventos)
+        index_eventos = list(data_frame[7][day-1]['evento'].index)
+        dict_options = dict(zip(options_eventos, index_eventos))
+        return slider_value, folium_map, options_eventos
+    else:
+        folium_map = map_folium(data_frame[0], data_frame[1], data_frame[2], data_frame[3],
+            data_frame[4][day-1], data_frame[5][day-1], data_frame[6][day-1], condition)
+        return slider_value, folium_map, dash.no_update
 
 @app.callback(
     Output('url-maps', 'pathname'),

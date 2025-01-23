@@ -31,73 +31,13 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 import math
 
 
-# Función auxiliar para etiquetas
-def get_labels(x: pd.Series) -> pd.Series:
-    labels, _ = pd.factorize(x)
-    return pd.Series(labels, name=x.name, index=x.index)
-
-# Definición de funciones personalizadas de pérdida
-def my_mse_loss_fn(y_pred, y_true):
-    mse_loss = (y_true - y_pred) ** 2
-    return torch.mean(mse_loss)
-
-def my_rmse_loss_fn(y_pred, y_true):
-    mse_loss = (y_true - y_pred) ** 2
-    mean_mse_loss = torch.mean(mse_loss)
-    rmse_loss = torch.sqrt(mean_mse_loss)
-    return rmse_loss
-
-def my_mae_loss_fn(y_pred, y_true):
-    mae_loss = torch.abs(y_true - y_pred)
-    return torch.mean(mae_loss)
-
-def my_mape_loss_fn(y_pred, y_true):
-    mape_loss = torch.abs((y_true - y_pred) / y_true) * 100
-    return torch.mean(mape_loss)
-
-def my_r2_score_fn(y_pred, y_true):
-    total_variance = torch.var(y_true, unbiased=False)
-    unexplained_variance = torch.mean((y_true - y_pred) ** 2)
-    r2_score = 1 - (unexplained_variance / total_variance)
-    return r2_score
-
-# Clase personalizada para TabNetRegressor
-class CustomTabNetRegressor(TabNetRegressor):
-    def __init__(self, *args, **kwargs):
-        super(CustomTabNetRegressor, self).__init__(*args, **kwargs)
-
-    def forward(self, X):
-        output, M_loss = self.network(X)
-        output = torch.relu(output)
-        return output, M_loss
-
-    def predict(self, X):
-        device = next(self.network.parameters()).device
-        if not isinstance(X, torch.Tensor):
-            X = torch.tensor(X, dtype=torch.float32)
-        X = X.to(device)
-        with torch.no_grad():
-            output, _ = self.forward(X)
-        return output.cpu().numpy()
-
-# Parámetros
-par = {
-    'n_d': 144, 'n_a': 144, 'n_steps': 10, 'gamma': 94.66997047890686,
-    'lambda_sparse': 2.8731055681649033e-11, 'batch_size': 4096,
-    'mask_type': 'entmax', 'emb': 46, 'momentum': 0.023136657722718557,
-    'learning_rate': 0.03017683806097458, 'weight_decay': 4.1323153592424204e-05,
-    'scheduler_gamma': 0.44928231250804757, 'step_size': 15,
-    'virtual_batch_size': 1024, 'optimizer_type': 'rmsprop',
-    'p': 0.9806570564809924
-}
-
 def create_combined_visualizations(mask, y_categorized, columns, SAIDI):
-    # Crear figura grande para 5 visualizaciones
-    fig = plt.figure(figsize=(25, 60))
-    
-    # Definir la disposición con 5 filas
-    gs = fig.add_gridspec(5, 1, height_ratios=[1, 1, 1, 1, 1], hspace=0.3)
-    
+    # Crear una figura grande para contener todas las visualizaciones
+    fig = plt.figure(figsize=(25, 50))
+
+    # Definir la disposición de los subplots
+    gs = fig.add_gridspec(4, 1, height_ratios=[1, 1, 1, 1], hspace=0.3)
+
     # 1. Visualización de la máscara original
     ax1 = fig.add_subplot(gs[0])
     im = ax1.imshow(mask, aspect='auto', cmap='viridis')
@@ -106,29 +46,30 @@ def create_combined_visualizations(mask, y_categorized, columns, SAIDI):
     ax1.set_ylabel("Muestras", fontsize=12)
     cbar = fig.colorbar(im, ax=ax1, orientation='vertical', fraction=0.046, pad=0.04)
     cbar.set_label("Valores", fontsize=12)
-    
+
     # 2. Gráficos de violín
+    ax2 = fig.add_subplot(gs[1])
     normalized_mask = softmax(mask, axis=1)
     column_relevance = np.mean(normalized_mask, axis=0)
     top_20_indices = np.argsort(column_relevance)[-20:]
     top_20_columns = columns[top_20_indices]
-    
+
     gs2 = gs[1].subgridspec(1, 4, wspace=0.3)
     axes_violin = [fig.add_subplot(gs2[0, i]) for i in range(4)]
-    
+
     class_titles = ['todas las muestras', 'Riesgo Bajo', 'Riesgo Medio', 'Riesgo Alto']
     class_indices = [0, 1, 2]
     colors = sns.color_palette("muted", len(top_20_columns))
-    
-    # Gráfica para todas las muestras (violín)
+
+    # Gráfica para todas las muestras
     top_20_mask = mask[:, top_20_indices]
     sns.violinplot(data=top_20_mask, inner="box", cut=0, palette=colors, ax=axes_violin[0])
     axes_violin[0].set_xticks(range(len(top_20_columns)))
     axes_violin[0].set_xticklabels(top_20_columns, rotation=90, fontsize=10)
     axes_violin[0].set_ylabel("Valores", fontsize=12)
     axes_violin[0].set_title(class_titles[0], fontsize=14)
-    
-    # Gráficas por clase (violín)
+
+    # Gráficas por clase
     for i, class_idx in enumerate(class_indices, 1):
         if np.any(y_categorized == class_idx):
             column_relevance = np.mean(mask[y_categorized == class_idx], axis=0)
@@ -142,20 +83,19 @@ def create_combined_visualizations(mask, y_categorized, columns, SAIDI):
         else:
             axes_violin[i].text(0.5, 0.5, f'No hay datos para {class_titles[i]}', fontsize=14, ha='center')
             axes_violin[i].set_axis_off()
-    
+
     # 3. Gráficos de barras
     gs3 = gs[2].subgridspec(1, 4, wspace=0.3)
     axes_bar = [fig.add_subplot(gs3[0, i]) for i in range(4)]
-    
-    # Gráfica para todas las muestras (barras)
+
+    # Gráfica para todas las muestras
     top_20_relevance = column_relevance[top_20_indices]
     axes_bar[0].bar(top_20_columns, top_20_relevance, color=sns.color_palette("muted", len(top_20_columns)))
     axes_bar[0].set_xticks(range(len(top_20_columns)))
     axes_bar[0].set_xticklabels(top_20_columns, rotation=90, fontsize=10)
     axes_bar[0].set_ylabel("Valores", fontsize=12)
     axes_bar[0].set_title("Todas las muestras", fontsize=14)
-    
-    # Gráficas por clase (barras)
+
     class_titles = ["Riesgo Bajo", "Riesgo Medio", "Riesgo Alto"]
     for i, class_idx in enumerate([0, 1, 2]):
         ax_index = i + 1
@@ -171,82 +111,57 @@ def create_combined_visualizations(mask, y_categorized, columns, SAIDI):
         else:
             axes_bar[ax_index].text(0.5, 0.5, f'No hay datos para {class_titles[i]}', fontsize=14, ha='center')
             axes_bar[ax_index].set_axis_off()
-    
-    # 4. Primer mapa de calor (correlación con SAIDI)
+
+    # 4. Mapas de calor de correlación
     mask_df = pd.DataFrame(normalized_mask, columns=columns)
     top_20_columns_all = calculate_top_20_columns(normalized_mask, columns)
     top_20_mask_df = mask_df[top_20_columns_all]
-    
+
     gs4 = gs[3].subgridspec(1, 4, wspace=0.3)
-    axes_heatmap1 = [fig.add_subplot(gs4[0, i]) for i in range(4)]
-    
+    axes_heatmap = [fig.add_subplot(gs4[0, i]) for i in range(4)]
+
     groups = {
         "Total": top_20_mask_df,
         "Riesgo Bajo": top_20_mask_df[y_categorized == 0],
         "Riesgo Medio": top_20_mask_df[y_categorized == 1],
         "Riesgo Alto": top_20_mask_df[y_categorized == 2],
     }
-    
-    # Añadir SAIDI a cada grupo
+
     for group_name, group_data in groups.items():
         if 'SAIDI' not in group_data.columns:
             groups[group_name] = group_data.copy()
             groups[group_name]['SAIDI'] = SAIDI[group_data.index]
-    
-    # Primer conjunto de mapas de calor
+
     for i, (group_name, group_data) in enumerate(groups.items()):
-        top_20_corr = top_20_correlation(group_data, single_column=True)
-        
-        if top_20_corr is not None:
-            sns.heatmap(
-                top_20_corr,
-                annot=True,
-                cmap="coolwarm",
-                ax=axes_heatmap1[i],
-                fmt=".2f"
-            )
-            axes_heatmap1[i].set_title(f"Correlación con SAIDI - {group_name}", fontsize=14)
-            axes_heatmap1[i].tick_params(axis='x', rotation=90, labelsize=10)
-            axes_heatmap1[i].tick_params(axis='y', labelsize=10)
-        else:
-            axes_heatmap1[i].text(0.5, 0.5, 'No hay datos disponibles', 
-                                horizontalalignment='center', 
-                                verticalalignment='center', 
-                                fontsize=16, 
-                                color='red')
-            axes_heatmap1[i].set_title(f"Correlación con SAIDI - {group_name}", fontsize=14)
-            axes_heatmap1[i].set_axis_off()
-    
-    # 5. Segundo mapa de calor (matriz completa)
-    gs5 = gs[4].subgridspec(1, 4, wspace=0.3)
-    axes_heatmap2 = [fig.add_subplot(gs5[0, i]) for i in range(4)]
-    
-    for i, (group_name, group_data) in enumerate(groups.items()):
-        top_20_corr = top_20_correlation(group_data, single_column=False)
-        
+        top_20_corr = top_20_correlation(group_data)
+
         if top_20_corr is not None:
             sns.heatmap(
                 top_20_corr,
                 cmap="coolwarm",
-                ax=axes_heatmap2[i],
-                fmt=".2f"
+                ax=axes_heatmap[i],
+                cbar=i==3,
+                fmt=".2f",
+                vmin=-1,
+                vmax=1
             )
-            axes_heatmap2[i].set_title(f"Matriz de Correlación - {group_name}", fontsize=14)
-            axes_heatmap2[i].tick_params(axis='x', rotation=90, labelsize=10)
-            axes_heatmap2[i].tick_params(axis='y', labelsize=10)
+            axes_heatmap[i].set_title(f"Correlación con SAIDI - {group_name}", fontsize=14)
+            axes_heatmap[i].tick_params(axis='x', rotation=90, labelsize=10)
+            axes_heatmap[i].tick_params(axis='y', labelsize=10)
         else:
-            axes_heatmap2[i].text(0.5, 0.5, 'No hay datos disponibles', 
-                                horizontalalignment='center', 
-                                verticalalignment='center', 
-                                fontsize=16, 
-                                color='red')
-            axes_heatmap2[i].set_title(f"Matriz de Correlación - {group_name}", fontsize=14)
-            axes_heatmap2[i].set_axis_off()
-    
+            axes_heatmap[i].text(0.5, 0.5, 'No hay datos disponibles',
+                               horizontalalignment='center',
+                               verticalalignment='center',
+                               fontsize=16,
+                               color='red')
+            axes_heatmap[i].set_title(f"Correlación con SAIDI - {group_name}", fontsize=14)
+            axes_heatmap[i].set_axis_off()
+
     # Ajustar el diseño final
     plt.tight_layout()
-    
+
     return fig
+
 
 # Funciones auxiliares
 def calculate_top_20_columns(mask, columns, top_n=20):
@@ -254,17 +169,12 @@ def calculate_top_20_columns(mask, columns, top_n=20):
     top_20_indices = np.argsort(column_relevance)[-top_n:]
     return columns[top_20_indices]
 
-def top_20_correlation(data, single_column=True, reference_col='SAIDI'):
+def top_20_correlation(data, reference_col='SAIDI'):
     if data.empty:
         return None
     correlation_matrix = data.corr()
-    if single_column:
-        correlation_with_reference = correlation_matrix[[reference_col]].abs().sort_values(by=reference_col, ascending=False)
-        correlation_with_reference.loc[reference_col] = 1.0
-        top_20_columns = correlation_with_reference.index[:20]
-        return correlation_with_reference.loc[top_20_columns]
-    else:
-        return correlation_matrix.abs()
+    correlation_with_reference = correlation_matrix.abs()
+    return correlation_with_reference
 
 
 def load_data():
@@ -326,6 +236,7 @@ def load_data():
     # Guardar en un archivo JSON
     with open("./options/criterias_2.json", "w") as f:
         json.dump(options, f)
+
 
     return mask, trafos, apoyos, redmt, switches, Xdata, df1, y, y_categorized, SAIDI
 

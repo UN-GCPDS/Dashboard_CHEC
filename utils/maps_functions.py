@@ -8,12 +8,245 @@ import networkx as nx
 from scipy.spatial import ConvexHull
 from shapely.geometry import LineString, Point
 
-def filtrar_aguas_abajo(grafo, nodo_inicial):
-    aguas_abajo = set(nx.descendants(grafo, nodo_inicial))
-    aguas_abajo.add(nodo_inicial)
-    return aguas_abajo
+import json
+import torch
+import seaborn as sns
+import matplotlib.pyplot as plt
+import warnings
+from scipy.special import softmax
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler, QuantileTransformer
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, accuracy_score
+from sklearn.neighbors import NearestNeighbors
+from pytorch_tabnet.tab_model import TabNetRegressor, TabNetClassifier
+from pytorch_tabnet.augmentations import RegressionSMOTE
+import os
+from pathlib import Path
+warnings.filterwarnings("ignore", category=FutureWarning, module="pandas")
+warnings.filterwarnings("ignore", category=FutureWarning)
+from sklearn.preprocessing import MinMaxScaler
 
-def select_data(año,mes,mun,trafos,apoyos,switches,redmt,super_eventos, descargas, vegetacion):
+# Función auxiliar para etiquetas
+def get_labels(x: pd.Series) -> pd.Series:
+    labels, _ = pd.factorize(x)
+    return pd.Series(labels, name=x.name, index=x.index)
+
+# Definición de funciones personalizadas de pérdida
+def my_mse_loss_fn(y_pred, y_true):
+    mse_loss = (y_true - y_pred) ** 2
+    return torch.mean(mse_loss)
+
+def my_rmse_loss_fn(y_pred, y_true):
+    mse_loss = (y_true - y_pred) ** 2
+    mean_mse_loss = torch.mean(mse_loss)
+    rmse_loss = torch.sqrt(mean_mse_loss)
+    return rmse_loss
+
+def my_mae_loss_fn(y_pred, y_true):
+    mae_loss = torch.abs(y_true - y_pred)
+    return torch.mean(mae_loss)
+
+def my_mape_loss_fn(y_pred, y_true):
+    mape_loss = torch.abs((y_true - y_pred) / y_true) * 100
+    return torch.mean(mape_loss)
+
+def my_r2_score_fn(y_pred, y_true):
+    total_variance = torch.var(y_true, unbiased=False)
+    unexplained_variance = torch.mean((y_true - y_pred) ** 2)
+    r2_score = 1 - (unexplained_variance / total_variance)
+    return r2_score
+
+class CustomTabNetRegressor(TabNetRegressor):
+    def __init__(self, *args, **kwargs):
+        super(CustomTabNetRegressor, self).__init__(*args, **kwargs)
+        self.network = self.network.to('cpu')
+
+    def forward(self, X):
+        X = X.to('cpu')
+        output, M_loss = self.network(X)
+        output = torch.relu(output)
+        return output, M_loss
+
+    def predict(self, X):
+        if not isinstance(X, torch.Tensor):
+            X = torch.tensor(X, dtype=torch.float32)
+        X = X.to('cpu')
+        with torch.no_grad():
+            output, _ = self.forward(X)
+        return output.numpy()
+
+# Parámetros
+par = {
+    'n_d': 144, 'n_a': 144, 'n_steps': 10, 'gamma': 94.66997047890686,
+    'lambda_sparse': 2.8731055681649033e-11, 'batch_size': 4096,
+    'mask_type': 'entmax', 'emb': 46, 'momentum': 0.023136657722718557,
+    'learning_rate': 0.03017683806097458, 'weight_decay': 4.1323153592424204e-05,
+    'scheduler_gamma': 0.44928231250804757, 'step_size': 15,
+    'virtual_batch_size': 1024, 'optimizer_type': 'rmsprop',
+    'p': 0.9806570564809924
+}
+
+def process_dataframe(redmt, df, label_encoders, df1, ind,tip,s,scolumns, NUMERIC_COLUMNS, max_values):
+    """
+    Procesa un DataFrame `redmt` usando coordenadas y LabelEncoders, y devuelve un DataFrame resultante.
+
+    Args:
+        redmt (pd.DataFrame): DataFrame base con información de referencia.
+        df (pd.DataFrame): DataFrame con coordenadas para encontrar vecinos cercanos.
+        label_encoders (dict): Diccionario con `LabelEncoder` para columnas categóricas.
+        df1 (pd.DataFrame): DataFrame con la fila de interés.
+        ind (int): Índice de la fila de interés en `df1`.
+
+    Returns:
+        pd.DataFrame: DataFrame resultante con los datos procesados.
+    """
+    target = ['SAIFI', 'SAIDI', 'duracion_h']
+    redmt['FECHA']=pd.to_datetime(redmt['FECHA'])
+    redmt['FECHA_C']=redmt['FECHA'].dt.to_period('M')
+    redmt.rename(columns={'CODE':'equipo_ope'}, inplace=True)
+    # Convertir las columnas de fecha
+    df1['inicio'] = pd.to_datetime(df1['inicio'])
+    df1['FECHA_C'] = df1['inicio'].dt.to_period('M')
+
+    # Seleccionar la fila de interés de `df1` (por índice)
+    row_of_interest = df1.loc[[ind]].copy()
+    #print('1',row_of_interest[['LATITUD','LONGITUD']].values)
+    #row_of_interest[scolumns]=np.nan
+    # Vaciar los valores de las columnas en `scolumns`
+    #for col in scolumns:
+    #    if col in row_of_interest.columns:
+    #        row_of_interest[col] = np.nan
+
+    # Extraer las listas de coordenadas y equipos desde la fila de interés
+    if s==0:
+        aux = eval(row_of_interest.loc[ind, 'TRAMOS_AGUAS_ABAJO'])
+    else:
+        aux = eval(row_of_interest.loc[ind, 'EQUIPOS_PUNTOS'])
+
+    # DataFrame para almacenar las nuevas filas
+    new_rows = []
+    # Iterar sobre cada elemento de `aux` para filtrar y duplicar
+    for i in aux:
+        # Filtrar `redmt` según las condiciones dadas
+
+        filtered_row = redmt[
+            (redmt['FECHA_C'] == row_of_interest.loc[ind, 'FECHA_C']) &
+            (redmt['LATITUD'] == i[0]) &
+            (redmt['LONGITUD'] == i[1])
+        ]
+        #print('2',filtered_row[['LATITUD','LONGITUD']].values)
+        # Si hay filas que cumplen la condición, reemplazar columnas en la fila de interés
+        if not filtered_row.empty:
+            for _, row in filtered_row.iterrows():
+                #print(3,redmt.columns)
+                # Crear una copia de la fila de interés y reemplazar las columnas correspondientes
+                temp_row = row_of_interest.copy()
+                temp_row[redmt.columns] = row.values  # Reemplaza las columnas de redmt
+                temp_row['LATITUD'] = np.float64(i[0])  # Asegura precisión en la asignación
+                temp_row['LONGITUD'] = np.float64(i[1])
+                new_rows.append(temp_row)
+    if not new_rows:
+        # Retornar un DataFrame vacío con las columnas esperadas
+        aux1=pd.DataFrame(columns=df1.columns)
+        aux1.drop(['inicio_evento', 'h0-solar_rad', 'h0-uv', 'h1-solar_rad', 'h1-uv', 'h2-solar_rad', 'h2-uv', 'h3-solar_rad', 'h3-uv',
+            'h4-solar_rad', 'h4-uv', 'h5-solar_rad', 'h5-uv', 'h19-solar_rad', 'h19-uv', 'h20-solar_rad', 'h20-uv',
+            'h21-solar_rad', 'h21-uv', 'h22-solar_rad', 'h22-uv', 'h23-solar_rad', 'h23-uv', 'evento', 'fin', 'inicio',
+            'cnt_usus', 'DEP', 'MUN', 'FECHA', 'NIVEL_C', 'VALOR_C', 'TRAMOS_AGUAS_ABAJO', 'EQUIPOS_PUNTOS',
+            'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C'],
+           inplace=True, axis=1)
+        aux1.drop(target, axis=1, inplace=True)
+        return pd.DataFrame(columns=scolumns).values,aux1
+    # Concatenar todas las nuevas filas generadas
+    result_df = pd.concat(new_rows, ignore_index=True)
+    result_df['LATITUD'] = result_df['LATITUD'].astype('float64')
+    result_df['LONGITUD'] = result_df['LONGITUD'].astype('float64')
+    result_df1 =result_df.copy()
+    result_df1['LATITUD'] = result_df1['LATITUD'].astype('float64')
+    result_df1['LONGITUD'] = result_df1['LONGITUD'].astype('float64')
+
+    # Codificar las columnas categóricas usando los LabelEncoder definidos en `label_encoders`
+    for col, le in label_encoders.items():
+      if col in result_df.columns:  # Verificar que la columna exista en `result_df`
+        if col in redmt.columns:  # Si la columna pertenece a redmt
+            result_df[col] = result_df[col].apply(
+                lambda x: le.transform([x])[0] if x in le.classes_ else np.nan
+            )
+        else:  # Si no pertenece a redmt
+            result_df[col] = result_df[col].fillna("no aplica")  # Rellenar NaN con "no aplica"
+            result_df[col] = result_df[col].apply(
+                lambda x: le.transform([x])[0] if x in le.classes_ else 0
+            )
+
+
+    # Reemplazar valores NaN en columnas categóricas usando el valor más cercano
+    categorical_columns = redmt.select_dtypes(include=['object', 'category']).columns
+
+    # Preparar las coordenadas (LATITUD y LONGITUD) de `df`
+    df_coords = df[['LATITUD', 'LONGITUD']].dropna()
+
+    # Modelo de vecinos más cercanos
+    nbrs = NearestNeighbors(n_neighbors=1, algorithm='auto').fit(df_coords)
+
+    # Recorrer las columnas categóricas de result_df
+    for col in result_df.columns:
+        if col in redmt.columns:  # Verificar si la columna pertenece a redmt
+            nan_indices = result_df[result_df[col].isna()].index  # Índices con NaN en la columna
+            for idx in nan_indices:
+                # Coordenadas de la fila con NaN
+                query_coords = result_df.loc[idx, ['LATITUD', 'LONGITUD']].values.reshape(1, -1)
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", message="X does not have valid feature names, but NearestNeighbors was fitted with feature names")
+                    distance, neighbor_idx = nbrs.kneighbors(query_coords)
+                closest_idx = df_coords.iloc[neighbor_idx[0][0]].name
+                # Reemplazar el valor NaN con el valor del vecino más cercano
+                result_df.at[idx, col] = df.at[closest_idx, col]
+        #else:
+            #result_df[col].astype(str).fillna("no aplica",inplace=True)
+    for col in NUMERIC_COLUMNS:
+        max_value = max_values[col]
+        # Rellenar valores y ajustar el tipo de datos
+        result_df[col] = result_df[col].fillna(-10 * max_value).astype('float64')
+
+    result_df['tipo_equi_ope'] = tip
+    result_df.drop(['inicio_evento', 'h0-solar_rad', 'h0-uv', 'h1-solar_rad', 'h1-uv', 'h2-solar_rad', 'h2-uv', 'h3-solar_rad', 'h3-uv',
+            'h4-solar_rad', 'h4-uv', 'h5-solar_rad', 'h5-uv', 'h19-solar_rad', 'h19-uv', 'h20-solar_rad', 'h20-uv',
+            'h21-solar_rad', 'h21-uv', 'h22-solar_rad', 'h22-uv', 'h23-solar_rad', 'h23-uv', 'evento', 'fin', 'inicio',
+            'cnt_usus', 'DEP', 'MUN', 'FECHA', 'NIVEL_C', 'VALOR_C', 'TRAMOS_AGUAS_ABAJO', 'EQUIPOS_PUNTOS',
+            'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C'],
+           inplace=True, axis=1)
+    result_df.drop(target, axis=1, inplace=True)
+    result_df1.drop(['inicio_evento', 'h0-solar_rad', 'h0-uv', 'h1-solar_rad', 'h1-uv', 'h2-solar_rad', 'h2-uv', 'h3-solar_rad', 'h3-uv',
+            'h4-solar_rad', 'h4-uv', 'h5-solar_rad', 'h5-uv', 'h19-solar_rad', 'h19-uv', 'h20-solar_rad', 'h20-uv',
+            'h21-solar_rad', 'h21-uv', 'h22-solar_rad', 'h22-uv', 'h23-solar_rad', 'h23-uv', 'evento', 'fin', 'inicio',
+            'cnt_usus', 'DEP', 'MUN', 'FECHA', 'NIVEL_C', 'VALOR_C', 'TRAMOS_AGUAS_ABAJO', 'EQUIPOS_PUNTOS',
+            'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C'],
+           inplace=True, axis=1)
+    result_df1.drop(target, axis=1, inplace=True)
+    return result_df.values,result_df1
+
+def enumerate_repeated_from_startup(lista):
+    # Diccionario para contar ocurrencias totales
+    conteo_total = {}
+    for elemento in lista:
+        conteo_total[elemento] = conteo_total.get(elemento, 0) + 1
+    
+    # Diccionario para seguir el conteo actual
+    conteo_actual = {}
+    resultado = []
+    
+    for elemento in lista:
+        if conteo_total[elemento] > 1:
+            # Si el elemento aparece más de una vez
+            conteo_actual[elemento] = conteo_actual.get(elemento, 0) + 1
+            resultado.append(f"{elemento}-{conteo_actual[elemento]}")
+        else:
+            # Si el elemento aparece solo una vez
+            resultado.append(elemento)
+            
+    return resultado
+
+
+def select_data(año,mes,mun,trafos,apoyos,switches,redmt,super_eventos, descargas, vegetacion, df1):
     trafos_seleccionado = trafos.loc[(trafos['FECHA'].dt.year == año) & (trafos['FECHA'].dt.month == mes) & (trafos['MUN'] == mun)]
     apoyos_seleccionado = apoyos.loc[(apoyos['FECHA'].dt.year == año) & (apoyos['FECHA'].dt.month == mes) & (apoyos['MUN'] == mun)]
     redmt_seleccionado = redmt.loc[(redmt['FECHA'].dt.year == año) & (redmt['FECHA'].dt.month == mes) & (redmt['MUN'] == mun)]
@@ -42,8 +275,16 @@ def select_data(año,mes,mun,trafos,apoyos,switches,redmt,super_eventos, descarg
         df_dia = vegetacion_seleccionado[vegetacion_seleccionado['FECHA'].dt.day == dia]       
         # Añadir el DataFrame a la lista para el seguimiento
         vegetacion_seleccionado_1.append(df_dia)
+    
+    df1_seleccionado = df1.loc[(df1['inicio'].dt.year == año) & (df1['inicio'].dt.month == mes) & (df1['MUN'] == mun)]
+    df1_seleccionado_1 = []
+    for dia in range(1, 32):  # Del día 1 al 31
+        df_dia = df1_seleccionado[df1_seleccionado['inicio'].dt.day == dia]       
+        # Añadir el DataFrame a la lista para el seguimiento
+        df1_seleccionado_1.append(df_dia)
 
-    return trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, redmt_seleccionado, super_eventos_seleccionado_1, descargas_seleccionado_1, vegetacion_seleccionado_1
+
+    return trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, redmt_seleccionado, super_eventos_seleccionado_1, descargas_seleccionado_1, vegetacion_seleccionado_1, df1_seleccionado_1
 
 def load_data():
 
@@ -61,7 +302,97 @@ def load_data():
 
     vegetacion = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/Vegetacion.pkl")
 
-    return trafos, apoyos, switches, redmt, super_eventos, descargas, vegetacion
+    Xdata = super_eventos.copy()
+    Xdata = Xdata[Xdata['duracion_h'] <= 100]
+
+    # Extraer variables objetivo
+    Dur_h = Xdata['duracion_h'].values
+    SAIDI = Xdata['SAIDI'].values
+    df1=Xdata.copy()
+    # Eliminar columnas no utilizadas
+    Xdata.drop(['inicio_evento', 'h0-solar_rad', 'h0-uv', 'h1-solar_rad', 'h1-uv', 'h2-solar_rad', 'h2-uv', 'h3-solar_rad', 'h3-uv',
+                'h4-solar_rad', 'h4-uv', 'h5-solar_rad', 'h5-uv', 'h19-solar_rad', 'h19-uv', 'h20-solar_rad', 'h20-uv',
+                'h21-solar_rad', 'h21-uv', 'h22-solar_rad', 'h22-uv', 'h23-solar_rad', 'h23-uv', 'evento', 'fin', 'inicio',
+                'cnt_usus', 'DEP', 'MUN', 'FECHA', 'NIVEL_C', 'VALOR_C', 'TRAMOS_AGUAS_ABAJO', 'EQUIPOS_PUNTOS',
+                'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C'],
+            inplace=True, axis=1)
+
+    # Definir la variable objetivo y eliminarla del conjunto de características
+    target = ['SAIFI', 'SAIDI', 'duracion_h']
+    y1 = Xdata[target].values
+    Xdata.drop(target, axis=1, inplace=True)
+
+    df = Xdata.copy()
+
+    # Identificar columnas numéricas y categóricas
+    NUMERIC_COLUMNS = df.select_dtypes(include=['number']).columns.tolist()
+    CATEGORICAL_COLUMNS = df.select_dtypes(include=['object', 'category']).columns.tolist()
+
+    # Crear diccionarios para guardar LabelEncoders y valores máximos
+    label_encoders = {}
+    max_values = {}
+    categorical_dims = {}
+    # Rellenar valores faltantes y guardar los valores máximos
+    for col in NUMERIC_COLUMNS:
+        max_value = df[col].max()
+        max_values[col] = max_value
+        df[col].fillna(-10 * max_value, inplace=True)
+
+    # Codificar variables categóricas y guardar LabelEncoders
+    for col in CATEGORICAL_COLUMNS:
+        l_enc = LabelEncoder()
+        l_enc.fit(df[col].astype(str).fillna("no aplica"))
+        df[col] = l_enc.transform(df[col].astype(str).fillna("no aplica"))
+        label_encoders[col] = l_enc
+        categorical_dims[col] = len(l_enc.classes_)
+    # Crear lista de características
+    unused_feat = []
+    features = [col for col in df.columns if col not in unused_feat + target]
+    # Preparar datos
+    X = df[features].values.astype('float32')
+    y = y1.astype('float32')
+    # Crear categorías basadas en percentiles
+    percentiles = np.percentile(y[:, 0], [33.33, 66.66])
+    y_categorized = np.digitize(y[:, 0:1].flatten(), bins=percentiles).astype(int)
+    scolumns = list(
+        set(redmt.columns)
+        .union(set(apoyos.columns))
+        .union(set(trafos.columns))
+        .union(set(switches.columns))
+    )
+
+    # Crear categorías basadas en percentiles
+    percentiles = np.percentile(y[:, 0], [33.33, 66.66])
+    y_categorized = np.digitize(y[:, 0:1].flatten(), bins=percentiles).astype(int)
+
+    # Escalar la variable objetivo
+    scaler = MinMaxScaler()
+    y_scaled = scaler.fit_transform(y)
+
+    # Dividir los datos en entrenamiento y prueba
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y_scaled, test_size=0.2, random_state=42, stratify=y_categorized)
+
+    # Dividir entrenamiento en entrenamiento y validación
+    percentiles_t = np.percentile(y_train[:, 0], [33.33, 66.66])
+    y_categorized_t = np.digitize(y_train[:, 0:1].flatten(), bins=percentiles_t).astype(int)
+    X_train, X_valid, y_train, y_valid = train_test_split(
+        X_train, y_train, test_size=0.2, random_state=42, stratify=y_categorized_t)
+
+
+    # Crear la lista de opciones
+    options = [{"label": " ", "value": ""}] + [{"label": col, "value": col} for col in df1.columns.to_list()]
+
+    if os.path.exists("./options/criterias_2.json"):
+        os.remove("./options/criterias_2.json")
+
+    # Guardar en un archivo JSON
+    with open("./options/criterias_2.json", "w") as f:
+        json.dump(options, f)
+
+    loaded_clf = torch.load("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/model.pth", map_location=torch.device('cpu'))
+
+    return trafos, apoyos, switches, redmt, super_eventos, descargas, vegetacion, df, df1, label_encoders, scolumns, NUMERIC_COLUMNS, max_values, loaded_clf
 
 def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, redmt_seleccionado, super_eventos_seleccionado, descargas_seleccionado, vegetacion_seleccionado, condicion):
     
@@ -499,7 +830,6 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
             puntos_verdes = eval(df['EQUIPOS_PUNTOS'].values[0]) 
             puntos_equipos.extend(puntos_verdes)
 
-        codes = [[], [], [], []]
 
         for _, row in redmt_seleccionado.iterrows():
             point1 = (row["LATITUD"], row["LONGITUD"])
@@ -507,7 +837,6 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
             
             if (point1 in nodos_aguas_abajo and point2 in nodos_aguas_abajo):
                 color = 'black'
-                codes[0].append(row['CODE']) 
             else:
                 color = 'gray'
                
@@ -524,7 +853,6 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
             point1 = (row["LATITUD"], row["LONGITUD"])
             if (point1 in puntos_equipos):
                 color = 'green'
-                codes[1].append(row['CODE'])
             else:
                 color = 'gray'
             folium.CircleMarker(
@@ -541,7 +869,6 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
             point1 = (row["LATITUD"], row["LONGITUD"])
             if (point1 in puntos_equipos):
                 color = 'blue'
-                codes[2].append(row['CODE'])
             else:
                 color = 'gray'
             folium.CircleMarker(
@@ -558,7 +885,6 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
             point1 = (row["LATITUD"], row["LONGITUD"])
             if (point1 in puntos_equipos):
                 color = 'purple'
-                codes[3].append(row['CODE'])
             else:
                 color = 'gray'
             folium.CircleMarker(
@@ -574,4 +900,206 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
 
         mapa_html = mapa._repr_html_()
     
-        return mapa_html, codes
+        return mapa_html
+
+
+def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, redmt_seleccionado, super_eventos_seleccionado, ind, df, df1, label_encoders, scolumns, NUMERIC_COLUMNS, max_values, loaded_clf):
+
+    a1,a1_df = process_dataframe(trafos_seleccionado, df, label_encoders, df1, ind=ind,tip=2,s=1,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
+    a2,a2_df = process_dataframe(switches_seleccionado, df, label_encoders, df1, ind=ind,tip=0,s=1,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
+    a3,a3_df = process_dataframe(redmt_seleccionado, df, label_encoders, df1, ind=ind,tip=1,s=0,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
+    a4,a4_df = process_dataframe(apoyos_seleccionado, df, label_encoders, df1, ind=ind,tip=2,s=1,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
+    columns=df.columns
+    arrays_to_concatenate = [arr for arr in (a1, a2, a3, a4) if arr.size > 0]
+    a = np.concatenate(arrays_to_concatenate, axis=0)
+    y_e=loaded_clf.predict(a)
+    y_e=y_e.flatten()
+    top_3_indices = np.argsort(y_e)[-3:][::-1]
+    _,masks=loaded_clf.explain(a[top_3_indices])
+    mask3=np.array(list(masks.values())).sum(axis=0)
+    # Definir los nombres de los equipos
+    equipo_nombres = {0: 'interruptor', 1: 'tramo de linea', 2: 'transformador', 'apoyo': 'apoyo'}
+
+    # Calcular los límites de los índices para cada conjunto
+    a1_end = len(a1)
+    a2_end = a1_end + len(a2)
+    a3_end = a2_end + len(a3)
+    a4_start = a3_end  # El inicio de `a4` es el final de `a3`
+
+    # Generar el diccionario final para las 3 muestras más relevantes
+    resultados = {}
+    columnas = df.columns.tolist()  # Obtener lista de nombres de columnas
+
+    # Encontrar las posiciones de LATITUD y LONGITUD
+    pos_latitud = columnas.index('LATITUD') if 'LATITUD' in columnas else None
+    pos_longitud = columnas.index('LONGITUD') if 'LONGITUD' in columnas else None
+    a_df=pd.concat((a1_df,a2_df,a3_df,a4_df),ignore_index=True)
+
+    # Crear un mapa centrado en la media de las coordenadas de los circuitos
+    map_center = [
+        switches_seleccionado.LATITUD.mean(),
+        switches_seleccionado.LONGITUD.mean()
+    ]
+    mapa = folium.Map(
+        location=map_center, 
+        zoom_start=11, 
+        tiles='None', 
+        attr='Map tiles by Stamen Design, CC BY 3.0 — Map data © OpenStreetMap contributors'
+    )
+
+    # Agregar el estilo satelital de Esri
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri",
+        name="Esri Satellite",
+        overlay=False,
+        control=False  # Desactiva el control de capas para que solo muestre Esri
+    ).add_to(mapa)
+
+    # Crear la leyenda HTML
+    legend_html = """
+    <div style="position: fixed; 
+                top: 15px; right: 10px; width: 110px; height: 160px; 
+                background-color: white; border:2px solid black; 
+                z-index:9999; font-size:12px; padding: 8px; opacity: 0.7;">
+        <i style="background-color:blue; width: 15px; height: 15px; display: inline-block;"></i> Apoyos<br>
+        <i style="background-color:green; width: 15px; height: 15px; display: inline-block;"></i> Trafos<br>
+        <i style="background-color:purple; width: 15px; height: 15px; display: inline-block;"></i> Switches<br>
+        <i style="background-color:black; width: 15px; height: 15px; display: inline-block;"></i> Red MT<br>
+        <i style="background-color:yellow; width: 15px; height: 15px; display: inline-block;"></i> CR baja<br>
+        <i style="background-color:orange; width: 15px; height: 15px; display: inline-block;"></i> CR media<br>
+        <i style="background-color:red; width: 15px; height: 15px; display: inline-block;"></i> CR alta<br>
+    </div>
+    """
+
+    # Añadir la leyenda directamente al mapa
+    mapa.get_root().html.add_child(folium.Element(legend_html))
+
+    nodos_aguas_abajo = set()
+    puntos_equipos = list()
+
+    for evento in super_eventos_seleccionado['evento'].values:
+        df_2 = super_eventos_seleccionado[super_eventos_seleccionado['evento'] == evento]
+        polygon_puntos = eval(df_2['PUNTOS_POLIGONO'].values[0])
+        # Dibuja el polígono en el mapa
+        match df['NIVEL_C'].values[0]:
+            case 0:
+                color = 'yellow'
+            case 1:
+                color = 'orange'
+            case _:
+                color = 'red'
+        if len(polygon_puntos) != 1:
+            folium.Polygon(locations=polygon_puntos, color=color, fill=True, fill_opacity=0.3, weight=0).add_to(mapa)
+
+        puntos_tramos = eval(df_2['TRAMOS_AGUAS_ABAJO'].values[0])
+        nodos_aguas_abajo.update(puntos_tramos)
+        
+        puntos_verdes = eval(df_2['EQUIPOS_PUNTOS'].values[0]) 
+        puntos_equipos.extend(puntos_verdes)
+
+
+    for _, row in redmt_seleccionado.iterrows():
+        point1 = (row["LATITUD"], row["LONGITUD"])
+        point2 = (row["LATITUD2"], row["LONGITUD2"])
+        
+        if (point1 in nodos_aguas_abajo and point2 in nodos_aguas_abajo):
+            color = 'black'
+        else:
+            color = 'gray'
+            
+        folium.PolyLine(
+            [point1, point2],
+            color=color,
+            weight=3,
+            opacity=1.0,
+            popup=f"Tramo de linea \n Material conductor: {row.MATERIALCONDUCTOR} \n Tipo conductor: {row.TIPOCONDUCTOR} \n Largo: {row.LENGTH} \n Calibre conductor: {row.CALIBRECONDUCTOR} \n Guarda conductor:{row.GUARDACONDUCTOR} \n Neutro conductor:{row.NEUTROCONDUCTOR} \n Calibre neutro:{row.CALIBRENEUTRO} \n Capacidad: {row.CAPACITY} \n Resistencia: {row.RESISTANCE:.4f} \n Acometida conductor: {row.ACOMETIDACONDUCTOR}"
+        ).add_to(mapa)
+
+    aporte_SAIDI=a_df[['LATITUD','LONGITUD']]
+    aporte_SAIDI['SAIDI']=y_e
+
+    # 1. Aplicar la transformación logarítmica (logaritmo base 10, puedes cambiar la base si es necesario)
+    aporte_SAIDI['log_transformada'] = np.log10(aporte_SAIDI['SAIDI'])
+
+    # 2. Escalar los datos al rango [5, 10] usando MinMaxScaler
+    scaler = MinMaxScaler(feature_range=(5, 10))
+    aporte_SAIDI['escalada'] = scaler.fit_transform(aporte_SAIDI[['log_transformada']])
+    
+    for _, row in trafos_seleccionado.iterrows():
+        point1 = (row["LATITUD"], row["LONGITUD"])
+        radio = 5
+        if (point1 in puntos_equipos):
+            color = 'green'
+        else:
+            color = 'gray'
+
+        resultado = aporte_SAIDI.loc[(aporte_SAIDI['LATITUD'] == row["LATITUD"]) & (aporte_SAIDI['LONGITUD'] == row["LONGITUD"]), 'escalada']
+
+        # Comprobar si se encontró el resultado
+        if not resultado.empty:
+            radio = resultado.values[0]
+
+        folium.CircleMarker(
+            location=(row["LATITUD"], row["LONGITUD"]),
+            radius=radio,
+            color=color,
+            fill=True,
+            fill_color=color,
+            fill_opacity=1.0,
+            popup=f"Trafo Fase: {row.PHASES} \n Propietario: {row.OWNER1} \n Impedancia: {row.IMPEDANCE} \n Marca: {row.MARCA} \n Fecha fabricacion: {row.DATE_FAB[:10]} \n Tipo subestación: {row.TIPO_SUB} \n KVA: {row.KVA} \n KV1: {row.KV1}"
+        ).add_to(mapa)
+
+    for _, row in apoyos_seleccionado.iterrows():
+        point1 = (row["LATITUD"], row["LONGITUD"])
+        radio = 5
+        if (point1 in puntos_equipos):
+            color = 'blue'
+        else:
+            color = 'gray'
+        
+        resultado = aporte_SAIDI.loc[(aporte_SAIDI['LATITUD'] == row["LATITUD"]) & (aporte_SAIDI['LONGITUD'] == row["LONGITUD"]), 'escalada']
+
+        # Comprobar si se encontró el resultado
+        if not resultado.empty:
+            radio = resultado.values[0]
+
+        folium.CircleMarker(
+            location=(row["LATITUD"], row["LONGITUD"]),
+            radius=radio,
+            color=color,
+            fill=True,
+            fill_color=color,
+            fill_opacity=1.0,
+            popup=f"Apoyo Propietario: {row.TOWNER} \n Tipo: {row.TIPO} \n Clase: {row.CLASE} \n Material: {row.MATERIAL} \n Longitud: {row.LONG_APOYO} \n Tierra pie: {row.TIERRA_PIE} \n Vientos: {row.VIENTOS}"
+        ).add_to(mapa)
+
+    for _, row in switches_seleccionado.iterrows():
+        point1 = (row["LATITUD"], row["LONGITUD"])
+        radio = 5
+        if (point1 in puntos_equipos):
+            color = 'purple'
+        else:
+            color = 'gray'
+
+        resultado = aporte_SAIDI.loc[(aporte_SAIDI['LATITUD'] == row["LATITUD"]) & (aporte_SAIDI['LONGITUD'] == row["LONGITUD"]), 'escalada']
+
+        # Comprobar si se encontró el resultado
+        if not resultado.empty:
+            radio = resultado.values[0]
+
+
+        folium.CircleMarker(
+            location=(row["LATITUD"], row["LONGITUD"]),
+            radius=radio,
+            color=color,
+            fill=True,
+            fill_color=color,
+            fill_opacity=1.0,
+            popup=f"Switche Fase: {row.PHASES} \n Codigo assembly: {row.ASSEMBLY} \n KV: {row.KV} \n Estado: {row.STATE}"
+        ).add_to(mapa)
+    
+
+    mapa_html = mapa._repr_html_()
+
+    return mapa_html
