@@ -10,7 +10,9 @@ from dash import Dash, html, dcc, Output, Input, State, ctx
 import dash_bootstrap_components as dbc
 from ui_components.ui_maps import create_layout
 from utils.maps_functions import select_data, load_data, map_folium, enumerate_repeated_from_startup, map_folium_2
-from functions.utils import obtener_clave_maximo_score
+from functions.utils import get_recommendations
+from flask import send_from_directory
+
 
 with open("./options/cond_env.json", "r", encoding='utf-8') as file:
     options_cond_env = json.load(file)
@@ -41,6 +43,10 @@ options_equipos = ['']
 evento_id = None
 tipo_equipo_id = None
 equipo_id = None
+
+@app.server.route('/graficos_interactivos/<path:filename>', endpoint='serve_graficos_interactivos')
+def serve_outputs(filename):
+   return send_from_directory("./graficos_interactivos", filename)
 
 layout.children[1]['date-container'].children = dcc.Dropdown(
                 id='select-date',
@@ -81,7 +87,17 @@ layout.children[1]['cond-env-container'].children = dcc.Dropdown(
                        'font-size': '20px'},
                 )
 
-criticidad_data = None
+criticidad_data = {"B38003":{
+                    "Tipo_de_equipo":"apoyo",
+                    "top_5": {'MATERIAL': "Poste metálico", 'h20-temp': '29.7', 'LONG_APOYO': "15.0", 'TIERRA_PIE': "T", 'h15-wind_gust_spd': "5.0"}},
+                    "E31437":{
+                    "Tipo_de_equipo":"apoyo",
+                    "top_5": {'MATERIAL': "Riel", 'h20-temp': '29.3', 'LONG_APOYO': "9.0", 'TIERRA_PIE': "T", 'h15-wind_gust_spd': "3.0"}},
+                    "B38007":{
+                    "Tipo_de_equipo": "apoyo",
+                    "top_5": {'MATERIAL': "Poste en Concreto", 'h20-temp': '30.1', 'LONG_APOYO': "12.0", 'TIERRA_PIE': "T", 'h15-wind_gust_spd': "1.0"}}}
+
+'''criticidad_data = None'''
 '''criticidad_data = {"B38003":{
                     "Tipo_de_equipo":"apoyo",
                     "top_5": {'MATERIAL': "Poste metálico", 'TEMPERATURA': '29.7', 'LONG_APOYO': "15.0", 'TIERRA_PIE': "T", 'VIENTO': "5.0"}},
@@ -138,7 +154,7 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
         click_count = n_clicks
         data_frame = select_data(
             int(selected_date[:4]), int(selected_date[5:7]), selected_municipios,
-            total_data[0], total_data[1], total_data[2], total_data[3], total_data[4], total_data[5], total_data[6]
+            total_data[0], total_data[1], total_data[2], total_data[3], total_data[4], total_data[5], total_data[6], total_data[8]
         )
         folium_map = map_folium(
             data_frame[0], data_frame[1], data_frame[2], data_frame[3],
@@ -393,74 +409,9 @@ def initialize_map(selected_date, selected_municipios, selected_env_condition, n
 def update_evento(evento_value):
     global evento_id
     if evento_value != evento_id:
-        print('Entró')
         evento_id = evento_value
     return dash.no_update
 
-'''@app.callback(
-        Output('folium_map_frame', 'srcDoc'),
-        Input('equipos-criticos-button', 'n_clicks'))
-
-def update_equipos_criticos(n_clicks):
-    global click_count_1
-    if (n_clicks > click_count_1) & (condition == 'CRITICIDAD') & (evento_id != None  | evento_id != ''):
-        click_count_1 = n_clicks
-        map = map_folium_2(data_frame[0], data_frame[1], data_frame[2], data_frame[3],
-            data_frame[4][day-1], dict_options[evento_id],total_data[7], total_data[8], total_data[9], 
-            total_data[10], total_data[13])
-        return map
-    else: 
-        return dash.no_update
-
-
-
-# Second callback to update the map  when the slider changes
-@app.callback(
-    [Output('date-slider', 'value'), 
-     Output('folium_map_frame', 'srcDoc'), 
-     Output('select-evento', 'options')],
-    [Input('decrease-btn', 'n_clicks'),
-     Input('increase-btn', 'n_clicks'),
-     Input('date-slider', 'value')],
-    [State('date-slider', 'min'),
-     State('date-slider', 'max')]
-)
-def update_slider_and_map(decrease_clicks, increase_clicks, slider_value, slider_min, slider_max):
-    decrease_clicks = decrease_clicks or 0
-    increase_clicks = increase_clicks or 0
-    triggered_id = ctx.triggered_id
-
-    if triggered_id == "decrease-btn" and slider_value > slider_min:
-        slider_value -= 1
-    elif triggered_id == "increase-btn" and slider_value < slider_max:
-        slider_value += 1
-
-    global day, data_frame, condition, options_eventos, dict_options
-    
-    # Si no hay cambio en el slider
-    if slider_value == day:
-        return slider_value, dash.no_update, dash.no_update
-
-    day = slider_value
-    print(f'Value:{day}')
-
-    if condition == 'CRITICIDAD':
-        folium_map = map_folium(
-            data_frame[0], data_frame[1], data_frame[2], data_frame[3],
-            data_frame[4][day-1], data_frame[5][day-1], data_frame[6][day-1], condition
-        )
-        options_eventos = list(data_frame[7][day-1]['evento'])
-        index_eventos = list(data_frame[7][day-1]['evento'].index)
-        dict_options = dict(zip(options_eventos, index_eventos))
-        options_eventos = enumerate_repeated_from_startup(options_eventos)
-        return slider_value, folium_map, options_eventos
-    else:
-        folium_map = map_folium(
-            data_frame[0], data_frame[1], data_frame[2], data_frame[3],
-            data_frame[4][day-1], data_frame[5][day-1], data_frame[6][day-1], condition
-        )
-        
-        return slider_value, folium_map, dash.no_update'''
 
 @app.callback(
     [Output('date-slider', 'value'), 
@@ -479,7 +430,6 @@ def update_maps_and_slider(decrease_clicks, increase_clicks, slider_value, equip
     triggered_id = ctx.triggered_id
     
     if triggered_id == "equipos-criticos-button":
-        print('Entró 2', evento_id,'\n', dict_options)
         if (equipos_clicks > click_count_1) and (condition == 'CRITICIDAD') and (evento_id is not None and evento_id != ''):
             click_count_1 = equipos_clicks
             map = map_folium_2(data_frame[0], data_frame[1], data_frame[2], data_frame[3],
@@ -538,6 +488,7 @@ def handle_url_update(select_evento_clicks, n_clicks_chat, n_clicks_graphs, n_cl
     if triggered_id == 'recomendacion-button' and select_evento_clicks:
         if (select_evento_clicks != evento_id) and (select_evento_clicks != None):
             evento_id = select_evento_clicks
+            get_recommendations(criticidad_data)
             return "/chat_page"  # Cambia esto al pathname correspondiente
         
 
@@ -552,57 +503,3 @@ def handle_url_update(select_evento_clicks, n_clicks_chat, n_clicks_graphs, n_cl
     raise exceptions.PreventUpdate
 
  
-
-
-
-'''@app.callback(Output('select-equipo-2', 'options'),
-              Input('select-tipo-equipo', 'value'))
-
-def update_tipo_equipo(tipo_equipo_value):
-    global options_tipo_equipo, options_equipos, tipo_equipo_id
-    if tipo_equipo_value != tipo_equipo_id:
-        match tipo_equipo_value:
-            case 'Tramo de línea':
-                options_equipos = [''] + codes[0]
-            case 'Transformador':
-                options_equipos = [''] + codes[1]
-            case 'Apoyo':
-                options_equipos = [''] + codes[2]
-            case 'Interruptor':
-                options_equipos = [''] + codes[3]
-            case _:
-                options_equipos = ['']
-            
-        return options_equipos
-    return dash.no_update
-
-@app.callback(Input('select-equipo-2', 'value'))
-
-def update_equipo(equipo_value):
-    global equipo_id
-    if equipo_value != equipo_id:
-        equipo_id = equipo_value
-
-@app.callback(
-    Output('url-maps', 'pathname'),
-    [Input('button-chat', 'n_clicks'),
-     Input('button-graphs', 'n_clicks'),
-     Input('button-tab-net', 'n_clicks')]
-)
-def redirect_to_pages(n_clicks_chat, n_clicks_graphs, n_clicks_tab_net):
-    # Obtener el contexto del trigger
-    ctx = callback_context
-    if not ctx.triggered:
-        raise exceptions.PreventUpdate
-
-    # Identificar qué botón disparó el callback
-    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
-    if triggered_id == 'button-chat' and n_clicks_chat:
-        return "/chat_page"
-    elif triggered_id == 'button-graphs' and n_clicks_graphs:
-        return "/graphs_page"
-    elif triggered_id == 'button-tab-net' and n_clicks_tab_net:
-        return "/tab-net_page"
-
-    raise exceptions.PreventUpdate'''

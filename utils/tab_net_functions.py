@@ -31,6 +31,8 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 import math
 
 
+
+
 def create_combined_visualizations(mask, y_categorized, columns, SAIDI):
     # Crear una figura grande para contener todas las visualizaciones
     fig = plt.figure(figsize=(25, 50))
@@ -111,51 +113,6 @@ def create_combined_visualizations(mask, y_categorized, columns, SAIDI):
         else:
             axes_bar[ax_index].text(0.5, 0.5, f'No hay datos para {class_titles[i]}', fontsize=14, ha='center')
             axes_bar[ax_index].set_axis_off()
-
-    # 4. Mapas de calor de correlación
-    mask_df = pd.DataFrame(normalized_mask, columns=columns)
-    top_20_columns_all = calculate_top_20_columns(normalized_mask, columns)
-    top_20_mask_df = mask_df[top_20_columns_all]
-
-    gs4 = gs[3].subgridspec(1, 4, wspace=0.3)
-    axes_heatmap = [fig.add_subplot(gs4[0, i]) for i in range(4)]
-
-    groups = {
-        "Total": top_20_mask_df,
-        "Riesgo Bajo": top_20_mask_df[y_categorized == 0],
-        "Riesgo Medio": top_20_mask_df[y_categorized == 1],
-        "Riesgo Alto": top_20_mask_df[y_categorized == 2],
-    }
-
-    for group_name, group_data in groups.items():
-        if 'SAIDI' not in group_data.columns:
-            groups[group_name] = group_data.copy()
-            groups[group_name]['SAIDI'] = SAIDI[group_data.index]
-
-    for i, (group_name, group_data) in enumerate(groups.items()):
-        top_20_corr = top_20_correlation(group_data)
-
-        if top_20_corr is not None:
-            sns.heatmap(
-                top_20_corr,
-                cmap="coolwarm",
-                ax=axes_heatmap[i],
-                cbar=i==3,
-                fmt=".2f",
-                vmin=-1,
-                vmax=1
-            )
-            axes_heatmap[i].set_title(f"Correlación con SAIDI - {group_name}", fontsize=14)
-            axes_heatmap[i].tick_params(axis='x', rotation=90, labelsize=10)
-            axes_heatmap[i].tick_params(axis='y', labelsize=10)
-        else:
-            axes_heatmap[i].text(0.5, 0.5, 'No hay datos disponibles',
-                               horizontalalignment='center',
-                               verticalalignment='center',
-                               fontsize=16,
-                               color='red')
-            axes_heatmap[i].set_title(f"Correlación con SAIDI - {group_name}", fontsize=14)
-            axes_heatmap[i].set_axis_off()
 
     # Ajustar el diseño final
     plt.tight_layout()

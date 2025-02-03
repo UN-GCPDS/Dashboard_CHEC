@@ -265,6 +265,10 @@ def work_space():
                 'flexDirection': 'column',
                 'alignItems': 'center'
                 }, children=[
+                    html.Div(id='select-subcriteria-1-1-tab-net', children=[]),
+                    html.Div(id='select-subcriteria-2-1-tab-net', children=[]),
+                    html.Div(id='select-subcriteria-3-1-tab-net', children=[]),
+                    html.Div(id='select-subcriteria-4-1-tab-net', children=[]),
                     ]
             )
     ]

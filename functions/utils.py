@@ -2,7 +2,9 @@
 import json
 import os
 import pickle
+import webbrowser
 import pandas as pd
+from neo4j import GraphDatabase
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain.chains.question_answering import load_qa_chain
@@ -260,149 +262,6 @@ def conversation(chat_id,query,model,procces):
         
         
         return response, flag_image
-'''
-def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genérame la recomendación') -> str:
-
-
-    
-    template = """
-    Eres un experto técnico en infraestructura eléctrica. Tu objetivo es dar recomendaciones y pautas 
-    normativas basadas en el contexto que se te proporciona. 
-
-    Instrucciones para tu respuesta:
-    1. Identifica las variables y sus valores que menciona el usuario.
-    2. Revisa el contexto normativo y la información histórica (chat_history) para entender las normas 
-    o límites aplicables.
-    3. Compara cada valor de la variable con las normas del contexto, explicando si cumple o no cumple. 
-    - Si no cumple, explica el riesgo o la consecuencia y brinda recomendaciones claras y accionables 
-        (qué cambiar, qué revisar, qué reforzar, etc.).
-    - Si cumple, explica por qué cumple y qué se debe tener en cuenta a futuro (mantenimiento, 
-        límites de uso, etc.).
-    4. Redacta tu respuesta en un tono claro, pero conversacional y cercano, sin usar una lista demasiado 
-    rígida. Estructura el texto en párrafos o viñetas libres para que sea más fácil de entender.
-    5. Si existe ambigüedad o falta de información, explica qué información adicional sería necesaria 
-    para dar una recomendación más completa.
-
-    Usa el siguiente contexto y el historial de la conversación para redactar la recomendación:
-
-    {context}
-
-    {chat_history}
-
-    Human: {human_input}
-
-    Chatbot (RESPUESTA RECOMENDACIÓN):
-    """
-
-    
-    prompt = PromptTemplate(
-        input_variables=["chat_history", "human_input", "context"], template=template
-    )
-
-
-    memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
-
-    if model=="gpt":
-        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
-    elif model=="llama1":
-        llm_chat=ChatOllama(model="llama3.1",temperature=0)
-    elif model=="llama2":
-        llm_chat=ChatOllama(model="llama3.2:1b",temperature=0)
-
-    
-    chain = load_qa_chain(llm_chat, chain_type="stuff", memory=memory, prompt=prompt)
-
-    # Load the chat history of the conversation for every particular agent
-    path_memory=f"memories/{chat_id}.pkl"
-    
-    
-    if os.path.exists(path_memory):
-        with open(path_memory, 'rb') as f:
-            memory = pickle.load(f) #memory of the conversation
-        
-        chain.memory=memory
-
-    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
-    responses=[]
-    docs_all=[]
-    for muestra in info_poligono.keys():
-        tipo_equipo=info_poligono[muestra]["Tipo_de_equipo"]
-        variables_recomendacion=pd.read_excel(f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_{tipo_equipo}.xlsx")
-        docs=[]
-        for variable in info_poligono[muestra]["top_5"].keys():
-            try:
-                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento "].iloc[0]
-            except:
-                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento"].iloc[0]
-            sugerencia=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Sugerencia"].iloc[0]
-            seccion_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Normativa"].iloc[0]
-            valor_variable=info_poligono[muestra]["top_5"][variable]
-            # load from disk
-            vectorstore = Chroma(persist_directory=f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/Dashboard_CHEC/embeddings_by_procces/{documento_buscar}",embedding_function=embeddings)
-            query=sugerencia+" "+seccion_buscar
-
-            docs_variable=vectorstore.similarity_search(query,k=5) #Retriever
-            docs=docs+docs_variable
-
-            query=f"Genéramen una recomendación para la variable {variable}, la cual tiene un valor de {valor_variable}. {sugerencia}"
-
-            response_all=chain({"input_documents": docs_variable, "human_input": query, "chat_history":memory}, #,"sugerencia":sugerencia},
-                    return_only_outputs=False) #AI answer
-    
-
-            response=response_all['output_text']
-            responses.append(response)
-        
-        
-
-        docs_all=docs_all+docs
-
-    
-
-        
-    #Save the chat history (memory) for a new iteration of the conversation for the general agent:
-    with open(path_memory, 'wb') as f:
-        pickle.dump(chain.memory, f)
-
-    
-
-    if human_input == 'Genérame la recomendación':
-        consolidar_prompt = f"""
-        A continuación tienes una lista de recomendaciones parciales generadas 
-        para diferentes variables. Tu tarea es integrarlas en un solo texto con 
-        un hilo narrativo cohesivo, tomando en cuenta el tono conversacional y 
-        la claridad requerida para un informe técnico.
-
-        Lista de recomendaciones parciales:
-        {chr(10).join(f"- {rec}" for rec in responses)}
-
-        Ahora, por favor, redacta un texto final único que integre todas 
-        estas recomendaciones de manera fluida y coherente, usando un tono 
-        claro y cercano, y respetando las pautas normativas y técnicas 
-        cuando corresponda.
-        """
-
-        # Realizamos la llamada final al LLM
-        consolidated_response = chain(
-            {
-                "input_documents": [],  # No requerimos documentos aquí
-                "human_input": consolidar_prompt,
-                "chat_history": chain.memory
-            },
-            return_only_outputs=False
-        )
-
-        # Este es el texto único que regresa el LLM, integrando todas las recomendaciones.
-        final_response = consolidated_response["output_text"]
-    else:
-        query=human_input
-        final_response==chain({"input_documents": docs_all, "human_input": query, "chat_history":memory}, #,"sugerencia":sugerencia},
-                    return_only_outputs=False) #AI answer
-        
-
-        
-    return final_response
-'''
 
 def get_structure_graph_recomendation(info_poligono):
     variables_por_equipo={}
@@ -421,6 +280,42 @@ def get_structure_graph_recomendation(info_poligono):
         variables_id = [elemento + "_"+ id for elemento in variables]
         for i,var in enumerate(variables):
             valor=info_poligono[id]["top_5"][var]
+            if var in list(variables_recomendacion["Variables"]):
+                pass
+            else:
+                variable_modificada = verifify_subcadena(var, 'pres','Presión Atmosférica')
+                if variable_modificada == var:
+                    variable_modificada = verifify_subcadena(var, 'rh','Humedad Relativa')
+                    if variable_modificada == var:
+                        variable_modificada = verifify_subcadena(var, 'slp','Presión a Nivel del Mar')
+                        if variable_modificada == var:
+                            variable_modificada = verifify_subcadena(var, 'solar_rad','Radiación Solar')
+                            if variable_modificada == var:
+                                variable_modificada = verifify_subcadena(var, 'temp','Temperatura Ambiente')
+                                if variable_modificada == var:
+                                    variable_modificada = verifify_subcadena(var, 'uv','Índice UV')
+                                    if variable_modificada == var:
+                                        variable_modificada = verifify_subcadena(var, 'vis','Visibilidad')
+                                        if variable_modificada == var:
+                                            variable_modificada = verifify_subcadena(var, 'wind_gust_spd','Ráfagas de Viento')
+                                            if variable_modificada == var:
+                                                variable_modificada = verifify_subcadena(var, 'wind_spd','Velocidad Promedio del Viento')
+                                            else:
+                                                var = variable_modificada
+                                        else:
+                                            var = variable_modificada
+                                    else:
+                                        var = variable_modificada
+                                else:
+                                    var = variable_modificada
+                            else:
+                                var = variable_modificada
+                        else:
+                            var = variable_modificada
+                    else:
+                        var = variable_modificada
+                else:
+                    var = variable_modificada
             try:
                 documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==var]["Documento "].iloc[0]
             except:
@@ -436,7 +331,38 @@ def get_structure_graph_recomendation(info_poligono):
 
     return variables_por_equipo, normativas_por_equipo, documentos_por_equipo, sugerencias_por_equipo
 
+
+
+def create_node(tx, label, properties):
+    # Excluir el 'id' del mapeo SET para evitar sobrescribirlo
+    properties_without_id = {k: v for k, v in properties.items() if k != 'id'}
+    
+    # Crear la parte del SET con formato "clave: $clave"
+    set_clause = ', '.join([f"{k}: ${k}" for k in properties_without_id.keys()])
+    
+    query = (
+        f"MERGE (n:{label} {{id: $id}}) "
+        f"SET n += {{{set_clause}}} "
+        f"RETURN n"
+    )
+    
+    tx.run(query, **properties)
+
+def create_relationship(tx, label1, id1, relation, label2, id2):
+    query = (
+        f"MATCH (a:{label1} {{id: $id1}}), (b:{label2} {{id: $id2}}) "
+        f"MERGE (a)-[:{relation}]->(b)"
+    )
+    tx.run(query, id1=id1, id2=id2)
 def get_html_graph_recomendation(variables_por_equipo,normativas_por_equipo,documentos_por_equipo,sugerencias_por_equipo,chat_id):
+    # --- Configuración de Neo4j ---
+    NEO4J_URI = "bolt://localhost:7687"  # Reemplaza con tu URI
+    NEO4J_USER = "neo4j"                # Reemplaza con tu usuario
+    NEO4J_PASSWORD = "proyectochec"         # Reemplaza con tu contraseña
+
+    driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+
+
     # Inicializar la red PyVis con fondo blanco y texto en negro
     net = Network(height="750px", width="100%", bgcolor="white", font_color="black")
 
@@ -447,52 +373,111 @@ def get_html_graph_recomendation(variables_por_equipo,normativas_por_equipo,docu
     color_documento = "#757575"         # Gris medio oscuro para documentos
     color_sugerencia = "#81c784"        # Verde claro para sugerencias
 
-    # --- Construcción del grafo ---
-    for equipo_id, vars_lista in variables_por_equipo.items():
-        # Agregar nodo de equipo con color verde
-        net.add_node(equipo_id, label=equipo_id, shape="ellipse", color=color_equipo, 
-                    title=f"Equipo: {equipo_id}")
+    with driver.session() as session:
+        for equipo_id, vars_lista in variables_por_equipo.items():
+            # Agregar nodo de equipo con color verde en PyVis
+            net.add_node(equipo_id, label=equipo_id, shape="ellipse", color=color_equipo, 
+                        title=f"Equipo: {equipo_id}")
 
-        # Procesar cada variable del equipo
-        for var in vars_lista:
-            var_nombre = var["nombre"]
+            # Crear nodo de equipo en Neo4j
+            equipo_properties = {
+                "id": equipo_id,
+                "label": equipo_id,
+                "shape": "ellipse",
+                "color": color_equipo,
+                "title": f"Equipo: {equipo_id}"
+            }
+            session.write_transaction(create_node, "Equipo", equipo_properties)
             
-            # Verificar si el nodo de la variable ya existe
-            nodos_actuales = [n["id"] for n in net.nodes]
-            if var_nombre not in nodos_actuales:
-                net.add_node(var_nombre, label=var_nombre, shape="box", color=color_variable,
-                            title=f"{var['descripcion']}\nValor: {var['valor']}")
-            
-            # Relacionar equipo con variable
-            net.add_edge(equipo_id, var_nombre, title="Tiene Variable Crítica",label="Tiene Variable Crítica")
-            
-            # Asociar normativa
-            norm_info = normativas_por_equipo.get(equipo_id, {}).get(var_nombre)
-            if norm_info:
-                norm_id = norm_info["id"]
-                # Verificar si el nodo de la normativa ya existe
-                if norm_id not in [n["id"] for n in net.nodes]:
-                    net.add_node(norm_id, label="Normativa", shape="diamond", color=color_normativa, 
-                                title=norm_info["descripcion"])
-                net.add_edge(var_nombre, norm_id, title="Regulado por",label="Regulado por")
-
-                # Asociar documento a la normativa
-                doc_info = documentos_por_equipo.get(equipo_id, {}).get(var_nombre)
-                if doc_info:
-                    doc_id = doc_info["id"]
-                    if doc_id not in [n["id"] for n in net.nodes]:
-                        net.add_node(doc_id, label=doc_info["nombre"], shape="database", color=color_documento, 
-                                    title=f"Documento: {doc_info['nombre']}")
-                    net.add_edge(norm_id, doc_id, title="Documentado en", label="Documentado en")
-            
-            # Asociar sugerencia a la variable
-            sug_info = sugerencias_por_equipo.get(equipo_id, {}).get(var_nombre)
-            if sug_info:
-                sug_id = sug_info["id"]
-                if sug_id not in [n["id"] for n in net.nodes]:
-                    net.add_node(sug_id, label="Sugerencia", shape="star", color=color_sugerencia, 
-                                title=sug_info["descripcion"])
-                net.add_edge(var_nombre, sug_id, title="con sugerencia",label="con sugerencia")
+            for var in vars_lista:
+                var_nombre = var["nombre"]
+                
+                # Agregar nodo de variable en PyVis
+                nodos_actuales = [n["id"] for n in net.nodes]
+                if var_nombre not in nodos_actuales:
+                    net.add_node(var_nombre, label=var_nombre, shape="box", color=color_variable,
+                                title=f"{var['descripcion']}\nValor: {var['valor']}")
+                
+                # Relacionar equipo con variable en PyVis
+                net.add_edge(equipo_id, var_nombre, label="Tiene Variable Crítica", title="Tiene Variable Crítica")
+                
+                # Crear nodo de variable en Neo4j
+                variable_properties = {
+                    "id": var_nombre,
+                    "label": var_nombre,
+                    "shape": "box",
+                    "color": color_variable,
+                    "description": var['descripcion'],
+                    "value": var['valor']
+                }
+                session.write_transaction(create_node, "Variable", variable_properties)
+                
+                # Crear relación "TIENE_VARIABLE_CRITICA" entre Equipo y Variable en Neo4j
+                session.write_transaction(create_relationship, "Equipo", equipo_id, "TIENE_VARIABLE_CRITICA", "Variable", var_nombre)
+        
+                # Asociar normativa
+                norm_info = normativas_por_equipo.get(equipo_id, {}).get(var_nombre)
+                if norm_info:
+                    norm_id = norm_info["id"]
+                    # Agregar nodo de normativa en PyVis si no existe
+                    if norm_id not in [n["id"] for n in net.nodes]:
+                        net.add_node(norm_id, label="Normativa", shape="diamond", color=color_normativa, 
+                                    title=norm_info["descripcion"])
+                    
+                    # Agregar relación en PyVis
+                    net.add_edge(var_nombre, norm_id, title="Regulado por", label="Regulado por")
+                    
+                    # Crear nodo de normativa en Neo4j
+                    normativa_properties = {
+                        "id": norm_id,
+                        "descripcion": norm_info["descripcion"]
+                    }
+                    session.write_transaction(create_node, "Normativa", normativa_properties)
+                    
+                    # Crear relación "REGULADO_POR" entre Variable y Normativa en Neo4j
+                    session.write_transaction(create_relationship, "Variable", var_nombre, "REGULADO_POR", "Normativa", norm_id)
+        
+                    # Asociar documento a la normativa
+                    doc_info = documentos_por_equipo.get(equipo_id, {}).get(var_nombre)
+                    if doc_info:
+                        doc_id = doc_info["id"]
+                        # Agregar nodo de documento en PyVis si no existe
+                        if doc_id not in [n["id"] for n in net.nodes]:
+                            net.add_node(doc_id, label=doc_info["nombre"], shape="database", color=color_documento, 
+                                        title=f"Documento: {doc_info['nombre']}")
+                        # Agregar relación en PyVis
+                        net.add_edge(norm_id, doc_id, title="Documentado en", label="Documentado en")
+                        
+                        # Crear nodo de documento en Neo4j
+                        documento_properties = {
+                            "id": doc_id,
+                            "nombre": doc_info["nombre"]
+                        }
+                        session.write_transaction(create_node, "Documento", documento_properties)
+                        
+                        # Crear relación "DOCUMENTADO_EN" entre Normativa y Documento en Neo4j
+                        session.write_transaction(create_relationship, "Normativa", norm_id, "DOCUMENTADO_EN", "Documento", doc_id)
+                
+                # Asociar sugerencia a la variable
+                sug_info = sugerencias_por_equipo.get(equipo_id, {}).get(var_nombre)
+                if sug_info:
+                    sug_id = sug_info["id"]
+                    # Agregar nodo de sugerencia en PyVis si no existe
+                    if sug_id not in [n["id"] for n in net.nodes]:
+                        net.add_node(sug_id, label="Sugerencia", shape="star", color=color_sugerencia, 
+                                    title=sug_info["descripcion"])
+                    # Agregar relación en PyVis
+                    net.add_edge(var_nombre, sug_id, title="con sugerencia", label="con sugerencia")
+                    
+                    # Crear nodo de sugerencia en Neo4j
+                    sugerencia_properties = {
+                        "id": sug_id,
+                        "descripcion": sug_info["descripcion"]
+                    }
+                    session.write_transaction(create_node, "Sugerencia", sugerencia_properties)
+                    
+                    # Crear relación "TIENE_SUGERENCIA" entre Variable y Sugerencia en Neo4j
+                    session.write_transaction(create_relationship, "Variable", var_nombre, "TIENE_SUGERENCIA", "Sugerencia", sug_id)
 
     # --- Configuración de física y opciones ---
     net.force_atlas_2based()  # Opcional, para un layout específico
@@ -521,6 +506,22 @@ def get_html_graph_recomendation(variables_por_equipo,normativas_por_equipo,docu
 
     # --- Generar y guardar el grafo en un archivo HTML ---
     net.write_html(f"./grafos_recomendacion/Flow_recomendation_{chat_id}.html")
+
+    driver.close()
+
+
+    # Abrir el archivo HTML en el navegador
+    # Asegúrate de que la ruta sea absoluta
+    ruta_absoluta = os.path.abspath(f"./grafos_recomendacion/Flow_recomendation_{chat_id}.html")
+
+    # Abre el archivo en el navegador
+    webbrowser.open(f'file://{ruta_absoluta}')
+
+def verifify_subcadena(cadena_principal, subcadena,to_return):
+    if subcadena in cadena_principal:
+        return to_return
+    else:
+        return cadena_principal
 
 
 def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genérame la recomendación') -> str:
@@ -590,6 +591,43 @@ def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genéra
         docs=[]
         partes=[]
         for variable in info_poligono[muestra]["top_5"].keys():
+            variable_original=variable
+            if variable in list(variables_recomendacion["Variables"]):
+                pass
+            else:
+                variable_modificada = verifify_subcadena(variable, 'pres','Presión Atmosférica')
+                if variable_modificada == variable:
+                    variable_modificada = verifify_subcadena(variable, 'rh','Humedad Relativa')
+                    if variable_modificada == variable:
+                        variable_modificada = verifify_subcadena(variable, 'slp','Presión a Nivel del Mar')
+                        if variable_modificada == variable:
+                            variable_modificada = verifify_subcadena(variable, 'solar_rad','Radiación Solar')
+                            if variable_modificada == variable:
+                                variable_modificada = verifify_subcadena(variable, 'temp','Temperatura Ambiente')
+                                if variable_modificada == variable:
+                                    variable_modificada = verifify_subcadena(variable, 'uv','Índice UV')
+                                    if variable_modificada == variable:
+                                        variable_modificada = verifify_subcadena(variable, 'vis','Visibilidad')
+                                        if variable_modificada == variable:
+                                            variable_modificada = verifify_subcadena(variable, 'wind_gust_spd','Ráfagas de Viento')
+                                            if variable_modificada == variable:
+                                                variable_modificada = verifify_subcadena(variable, 'wind_spd','Velocidad Promedio del Viento')
+                                            else:
+                                                variable = variable_modificada
+                                        else:
+                                            variable = variable_modificada
+                                    else:
+                                        variable = variable_modificada
+                                else:
+                                    variable = variable_modificada
+                            else:
+                                variable = variable_modificada
+                        else:
+                            variable = variable_modificada
+                    else:
+                        variable = variable_modificada
+                else:
+                    variable = variable_modificada
             memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
             try:
                 documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento "].iloc[0]
@@ -597,7 +635,7 @@ def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genéra
                 documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento"].iloc[0]
             sugerencia=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Sugerencia"].iloc[0]
             seccion_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Normativa"].iloc[0]
-            valor_variable=info_poligono[muestra]["top_5"][variable]
+            valor_variable=info_poligono[muestra]["top_5"][variable_original]
             # load from disk
             vectorstore = Chroma(persist_directory=f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/Dashboard_CHEC/embeddings_by_procces/{documento_buscar}",embedding_function=embeddings)
             query=sugerencia+" "+seccion_buscar

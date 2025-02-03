@@ -1,5 +1,7 @@
+import io
 import math
 import folium
+import html
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -10,10 +12,14 @@ from shapely.geometry import LineString, Point
 
 import json
 import torch
+import webbrowser
 import seaborn as sns
 import matplotlib.pyplot as plt
 import warnings
+from pyvis.network import Network
 from scipy.special import softmax
+from unidecode import unidecode
+from scipy.spatial.distance import cdist, squareform
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler, QuantileTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, accuracy_score
@@ -25,6 +31,25 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=FutureWarning, module="pandas")
 warnings.filterwarnings("ignore", category=FutureWarning)
 from sklearn.preprocessing import MinMaxScaler
+from matplotlib import cm, colors, pyplot as plt
+
+import sys
+sys.stdin.reconfigure(encoding='utf-8')
+sys.stdout.reconfigure(encoding='utf-8')
+
+def safe_write_html(grafo, filename):
+    """
+    Escribe el HTML del grafo de manera segura manejando problemas de codificación
+    """
+    try:
+        # Intentar escribir con diferentes estrategias de codificación
+        with open(filename, 'w', encoding='utf-8', errors='ignore') as f:
+            f.write(grafo.html)
+    except Exception as e:
+        # Escribir sin especificar codificación
+        with open(filename, 'w') as f:
+            f.write(grafo.html)
+        print(f"Advertencia: Error al escribir {filename}. Detalles: {e}")
 
 # Función auxiliar para etiquetas
 def get_labels(x: pd.Series) -> pd.Series:
@@ -85,6 +110,71 @@ par = {
     'virtual_batch_size': 1024, 'optimizer_type': 'rmsprop',
     'p': 0.9806570564809924
 }
+
+def graficar_grafo_interactivo_2(Z, nombres_columnas, num=0, height=400, width=70, iteraciones=20, vector=None):
+    """
+    Función para graficar un grafo interactivo con Pyvis y mostrar una barra de colores.
+    """
+    # Calcular la matriz de similitud
+    D_ = cdist(Z.T, Z.T)  # Cambiar Z a Z.T si los datos deben ser transpuestos
+    sig_ = 0.05 * np.median(squareform(D_))
+    eps = 1e-10  # Pequeño valor para evitar división por cero
+    A = np.exp(-D_**2 / (sig_**2 + eps))
+
+    # Crear el grafo y eliminar aristas con pesos bajos
+    G = nx.from_numpy_array(A - np.eye(A.shape[0]))
+    edges_to_remove = [(u, v) for u, v, data in G.edges(data=True) if data['weight'] < 1e-8]
+    G.remove_edges_from(edges_to_remove)
+
+    # Calcular colores de nodos usando el vector si se proporciona
+    if vector is not None:
+        mean_values = vector
+    else:
+        mean_values = np.mean(Z, axis=0)
+
+    # Normalizar los valores
+    mean_values = (mean_values - np.min(mean_values)) / (np.max(mean_values) - np.min(mean_values))
+    norm = colors.Normalize(vmin=np.min(mean_values), vmax=np.max(mean_values))
+    cmap = cm.get_cmap('viridis')  # Cambiar el colormap si lo deseas
+
+    # Asignar colores a los nodos
+    node_colors = [colors.to_hex(cmap(norm(value))) for value in mean_values]
+
+    # Crear el grafo interactivo con Pyvis
+    net = Network(notebook=True, height=f"{height}px", width=f"{width}%", bgcolor="#FFFFFF", font_color="black", cdn_resources="in_line")
+
+    for i, node in enumerate(G.nodes):
+        # Convertir nombres de columnas a cadenas ASCII seguros
+        safe_label = unidecode(str(nombres_columnas[node]))
+        safe_title = unidecode(f"{nombres_columnas[node]}: {mean_values[i]:.2f}")
+
+        net.add_node(
+            node,
+            label=safe_label,  # Nombre del nodo
+            color=node_colors[i],         # Color del nodo basado en mean_values
+            title=safe_title,  # Tooltip al pasar el ratón
+            font={'size': 20}             # Tamaño del texto
+        )
+
+    # Agregar aristas al grafo
+    for edge in G.edges:
+        net.add_edge(edge[0], edge[1])
+
+    # Configurar las opciones de simulación física con iteraciones dinámicas
+    net.set_options(f"""
+    var options = {{
+        "physics": {{
+            "enabled": true,
+            "stabilization": {{
+                "enabled": true,
+                "iterations": {iteraciones}
+            }},
+            "solver": "forceAtlas2Based"
+        }}
+    }}
+    """)
+    
+    return net
 
 def process_dataframe(redmt, df, label_encoders, df1, ind,tip,s,scolumns, NUMERIC_COLUMNS, max_values):
     """
@@ -935,6 +1025,52 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
     pos_longitud = columnas.index('LONGITUD') if 'LONGITUD' in columnas else None
     a_df=pd.concat((a1_df,a2_df,a3_df,a4_df),ignore_index=True)
 
+    aux_eq=[]
+    # Iterar sobre las 3 muestras más relevantes
+    for idx, muestra_idx in enumerate(top_3_indices):
+        # Determinar el tipo de equipo según el índice
+        if muestra_idx >= a4_start:
+            tipo_equipo = 'apoyo'  # Índices correspondientes a `a4`
+        else:
+            tipo_equipo = equipo_nombres.get(a[muestra_idx, 1], 'desconocido')  # Columna 1 determina el tipo
+        aux_eq.append(tipo_equipo)
+        # Obtener las 10 columnas más relevantes según `mask3`
+        top_10_indices = np.argsort(mask3[idx])[-20:][::-1]  # Ordenar en descendente
+        top_10_columnas = [columns[i] for i in top_10_indices]
+        # Obtener los valores correspondientes a las 10 columnas más relevantes
+        top_10_valores = [a_df.iloc[idx, i] for i in top_10_indices]
+
+        # Crear un diccionario temporal de las variables y sus valores
+        temp_variables = dict(zip(top_10_columnas, top_10_valores))
+
+            # Filtrar variables que pertenecen al tipo de equipo actual
+        if tipo_equipo=='apoyo':
+            allowed_columns = set(df.columns).difference(set(trafos_seleccionado.columns)).difference(set(switches_seleccionado.columns)).difference(set(redmt_seleccionado.columns))
+        elif tipo_equipo=='interruptor':
+            allowed_columns = set(df.columns).difference(set(trafos_seleccionado.columns)).difference(set(redmt_seleccionado.columns)).difference(set(apoyos_seleccionado.columns))
+        elif tipo_equipo=='tramo de linea':
+            allowed_columns = set(df.columns).difference(set(trafos_seleccionado.columns)).difference(set(switches_seleccionado.columns)).difference(set(apoyos_seleccionado.columns))
+        elif tipo_equipo=='transformador':
+            allowed_columns = set(df.columns).difference(set(switches_seleccionado.columns)).difference(set(redmt_seleccionado.columns)).difference(set(apoyos_seleccionado.columns))
+
+        filtered_variables = {k: v for k, v in temp_variables.items() if k in allowed_columns}
+        #filtered_variables = {k: v for k, v in filtered_variables.items() if isinstance(v, (int, float)) and not math.isnan(v)}
+        resultados[f'muestra_{idx+1}'] = {
+            'tipo_equipo': tipo_equipo,
+            'top_5_variables': dict(list(filtered_variables.items())[:5]),  # Top 10 relevantes después del filtro
+            'posición': (a[muestra_idx, pos_latitud], a[muestra_idx, pos_longitud])
+        }
+
+    resultado = []
+    for _, info in resultados.items():
+        resultado.append([switches_seleccionado.loc[(switches_seleccionado['LATITUD'] == info['posición'][0]) & (switches_seleccionado['LONGITUD'] == info['posición'][1]), 'equipo_ope'].unique(),'switch'])
+        resultado.append([apoyos_seleccionado.loc[(apoyos_seleccionado['LATITUD'] == info['posición'][0]) & (apoyos_seleccionado['LONGITUD'] == info['posición'][1]), 'equipo_ope'].unique(),'apoyo'])
+        resultado.append([trafos_seleccionado.loc[(trafos_seleccionado['LATITUD'] == info['posición'][0]) & (trafos_seleccionado['LONGITUD'] == info['posición'][1]), 'equipo_ope'].unique(),'transformador'])
+    
+    equipos_criticos = [item for item in resultado if item[0].size > 0]
+    codigo_equipos_criticos = [item[0][0] for item in equipos_criticos]
+    tipo_equipos_criticos = [item[1] for item in equipos_criticos] 
+
     # Crear un mapa centrado en la media de las coordenadas de los circuitos
     map_center = [
         switches_seleccionado.LATITUD.mean(),
@@ -1016,13 +1152,18 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
             popup=f"Tramo de linea \n Material conductor: {row.MATERIALCONDUCTOR} \n Tipo conductor: {row.TIPOCONDUCTOR} \n Largo: {row.LENGTH} \n Calibre conductor: {row.CALIBRECONDUCTOR} \n Guarda conductor:{row.GUARDACONDUCTOR} \n Neutro conductor:{row.NEUTROCONDUCTOR} \n Calibre neutro:{row.CALIBRENEUTRO} \n Capacidad: {row.CAPACITY} \n Resistencia: {row.RESISTANCE:.4f} \n Acometida conductor: {row.ACOMETIDACONDUCTOR}"
         ).add_to(mapa)
 
-    aporte_SAIDI=a_df[['LATITUD','LONGITUD']]
-    aporte_SAIDI['SAIDI']=y_e
+    # Crear el dataframe `aporte_SAIDI`
+    aporte_SAIDI = a_df[['LATITUD', 'LONGITUD']].copy()
+    aporte_SAIDI['SAIDI'] = y_e
 
-    # 1. Aplicar la transformación logarítmica (logaritmo base 10, puedes cambiar la base si es necesario)
+    # Reemplazar valores <= 0 con un pequeño número positivo para evitar problemas en el logaritmo
+    aporte_SAIDI.loc[aporte_SAIDI['SAIDI'] == 0, 'SAIDI'] = np.nan  # Convierte 0 a NaN
+    aporte_SAIDI['SAIDI'] = aporte_SAIDI['SAIDI'].fillna(1e-6)       # Sustituye NaN por un valor pequeño
+
+    # Aplicar la transformación logarítmica (logaritmo base 10)
     aporte_SAIDI['log_transformada'] = np.log10(aporte_SAIDI['SAIDI'])
 
-    # 2. Escalar los datos al rango [5, 10] usando MinMaxScaler
+    # 2. Escalar los datos al rango [2, 5] usando MinMaxScaler
     scaler = MinMaxScaler(feature_range=(5, 10))
     aporte_SAIDI['escalada'] = scaler.fit_transform(aporte_SAIDI[['log_transformada']])
     
@@ -1100,5 +1241,117 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
     
 
     mapa_html = mapa._repr_html_()
+
+    for idx, sample_idx in enumerate(top_3_indices):
+    
+        # Determinar el tipo de equipo según el índice
+        if sample_idx >= a4_start:
+            tipo_equipo = 'apoyo'
+        else:
+            tipo_equipo = equipo_nombres.get(a[sample_idx, 1], 'desconocido')  # Columna 1 determina el tipo
+
+        # Obtener las 10 columnas más relevantes según `mask3`
+        sample_idx_position = np.where(top_3_indices == sample_idx)[0][0]
+        top_10_indices = np.argsort(mask3[sample_idx_position])[-10:][::-1]  # Ordenar en descendente
+        top_10_columnas = [columns[i] for i in top_10_indices]
+
+        # Graficar el gráfico interactivo
+        grafo = graficar_grafo_interactivo_2(
+            mask3[sample_idx_position][top_10_indices].reshape(1, -1),
+            top_10_columnas,
+            width=100,
+            height=750
+        )
+
+        # Guardar el gráfico como archivo HTML
+        grafo.write_html(f"./graficos_interactivos/grafo_muestra_{idx+1}.html")
+        print(f"Archivo HTML generado: graficos_interactivos/grafo_muestra_{idx+1}.html (Tipo de Equipo: {tipo_equipo})")
+
+    _,masks4=loaded_clf.explain(a)
+    masks4=np.array(list(masks4.values())).sum(axis=0)
+    aux_ind=[]
+    aux_eq=[]
+    # Iterar sobre las 3 muestras más relevantes
+    for idx in range(masks4.shape[0]):
+        # Determinar el tipo de equipo según el índice
+        if idx>= a4_start:
+            tipo_equipo = 'apoyo'  # Índices correspondientes a `a4`
+        else:
+            tipo_equipo = equipo_nombres.get(a[idx, 1], 'desconocido')  # Columna 1 determina el tipo
+        aux_eq.append(tipo_equipo)
+
+    grafo = graficar_grafo_interactivo_2(masks4.T,aux_eq,iteraciones=100,vector=y_e,width=100,height=750)
+    # Guardar el gráfico como archivo HTML
+    grafo.write_html(f"./graficos_interactivos/grafo_interactivo_0.html")    
+
+    # Ruta del directorio con los archivos HTML generados
+    output_dir = "./graficos_interactivos/"
+    output_combined_file = "./graficos_interactivos/grafo_combinado.html"
+
+    # Lista de archivos HTML generados
+    html_files = [f"grafo_muestra_{i + 1}.html" for i in range(len(top_3_indices))] + ["grafo_interactivo_0.html"]
+
+    # Iniciar el contenido del archivo combinado
+    html_combined = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Gráficos Combinados</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+            }
+            .container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            iframe {
+                margin: 20px;
+                border: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+    """
+
+    # Agregar cada archivo HTML como un iframe
+    for idx, html_file in enumerate(html_files):
+        file_path = os.path.join(output_dir, html_file)
+        if os.path.exists(file_path):
+            if idx == 3:
+                html_combined += f"""
+                    <h3>Grafos red afectada</h3>
+                    <iframe src="{html_file}" width="100%" height="600px"></iframe>
+                    """
+            else:
+                html_combined += f"""
+                <h3>Grafo equipo {tipo_equipos_criticos[idx]} con ID {codigo_equipos_criticos[idx]}</h3>
+                <iframe src="{html_file}" width="100%" height="600px"></iframe>
+                """
+        else:
+            print(f"Advertencia: No se encontró el archivo {file_path}")
+
+    # Cerrar el HTML combinado
+    html_combined += """
+        </div>
+    </body>
+    </html>
+    """
+
+    # Guardar el archivo combinado
+    os.makedirs(output_dir, exist_ok=True)
+    with open(output_combined_file, "w", encoding="utf-8") as f:
+        f.write(html_combined)  
+
+    # Abrir el archivo HTML en el navegador
+    # Asegúrate de que la ruta sea absoluta
+    ruta_absoluta = os.path.abspath("./graficos_interactivos/grafo_combinado.html")
+
+    # Abre el archivo en el navegador
+    webbrowser.open(f'file://{ruta_absoluta}')  
+    
 
     return mapa_html

@@ -520,8 +520,11 @@ def select_subcriteria_1(selection_sub_criteria_1):
                                         
                                                 return None
 
+                        elif selection_sub_criteria_1 == '':
+                               selection_criteria[1][1] = ''
+                        
                         else:
-                                return None
+                                return dash.no_update
 
                 case 'Eventos Tramo':
                
@@ -744,8 +747,11 @@ def select_subcriteria_1(selection_sub_criteria_1):
                                         
                                                 return None
 
+                        elif selection_sub_criteria_1 == '':
+                               selection_criteria[1][1] = ''
+                        
                         else:
-                                return None
+                                return dash.no_update
 
                 case 'Eventos Transformador':
                
@@ -968,12 +974,15 @@ def select_subcriteria_1(selection_sub_criteria_1):
                                                 
                                                 return None
 
+                        elif selection_sub_criteria_1 == '':
+                               selection_criteria[1][1] = ''
+                        
                         else:
-                               return None
+                                return dash.no_update
 
                 case _:
                       
-                      return None
+                      return dash.no_update
 
 @app.callback(
     Input('select-subcriteria-1-1', 'value'),
@@ -1220,8 +1229,11 @@ def select_subcriteria_2(selection_sub_criteria_2):
                                         
                                                 return None
 
+                        elif selection_sub_criteria_2 == '':
+                               selection_criteria[2][1] = ''
+                        
                         else:
-                                return None
+                                return dash.no_update
 
                 case 'Eventos Tramo':
                
@@ -1444,8 +1456,11 @@ def select_subcriteria_2(selection_sub_criteria_2):
                                         
                                                 return None
 
+                        elif selection_sub_criteria_2 == '':
+                               selection_criteria[2][1] = ''
+                        
                         else:
-                                return None
+                                return dash.no_update
 
                 case 'Eventos Transformador':
                
@@ -1668,12 +1683,15 @@ def select_subcriteria_2(selection_sub_criteria_2):
                                                 
                                                 return None
 
+                        elif selection_sub_criteria_2 == '':
+                               selection_criteria[2][1] = ''
+                        
                         else:
-                               return None
+                                return dash.no_update
 
                 case _:
                       
-                      return None
+                      return dash.no_update
 
 @app.callback(
     Input('select-subcriteria-2-1', 'value'),
@@ -1920,8 +1938,11 @@ def select_subcriteria_3(selection_sub_criteria_3):
                                         
                                                 return None
 
+                        elif selection_sub_criteria_3 == '':
+                               selection_criteria[3][1] = ''
+                        
                         else:
-                                return None
+                                return dash.no_update
 
                 case 'Eventos Tramo':
                
@@ -2144,8 +2165,11 @@ def select_subcriteria_3(selection_sub_criteria_3):
                                         
                                                 return None
 
+                        elif selection_sub_criteria_3 == '':
+                               selection_criteria[3][1] = ''
+                        
                         else:
-                                return None
+                                return dash.no_update
 
                 case 'Eventos Transformador':
                
@@ -2368,12 +2392,15 @@ def select_subcriteria_3(selection_sub_criteria_3):
                                                 
                                                 return None
 
+                        elif selection_sub_criteria_3 == '':
+                               selection_criteria[3][1] = ''
+                        
                         else:
-                               return None
+                                return dash.no_update
 
                 case _:
                       
-                      return None
+                      return dash.no_update
 
 @app.callback(
     Input('select-subcriteria-3-1', 'value'),
@@ -2620,8 +2647,11 @@ def select_subcriteria_4(selection_sub_criteria_4):
                                         
                                                 return None
 
+                        elif selection_sub_criteria_4 == '':
+                               selection_criteria[4][1] = ''
+                        
                         else:
-                                return None
+                                return dash.no_update
 
                 case 'Eventos Tramo':
                
@@ -2844,8 +2874,11 @@ def select_subcriteria_4(selection_sub_criteria_4):
                                         
                                                 return None
 
+                        elif selection_sub_criteria_4 == '':
+                               selection_criteria[4][1] = ''
+                        
                         else:
-                                return None
+                                return dash.no_update
 
                 case 'Eventos Transformador':
                
@@ -3068,8 +3101,11 @@ def select_subcriteria_4(selection_sub_criteria_4):
                                                 
                                                 return None
 
+                        elif selection_sub_criteria_4 == '':
+                               selection_criteria[4][1] = ''
+                        
                         else:
-                               return None
+                                return dash.no_update
 
                 case _:
                       

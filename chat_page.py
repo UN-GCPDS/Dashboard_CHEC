@@ -177,11 +177,9 @@ UPLOAD_DIRECTORY = "Unstructured_Files"
 if not os.path.exists(UPLOAD_DIRECTORY):
     os.makedirs(UPLOAD_DIRECTORY)
 
-
 if maps_page.criticidad_data is not None:
     
     get_recommendations(maps_page.criticidad_data)
-
     
 # Ruta para servir archivos desde 'Unstructured_Files'
 @app.server.route('/Unstructured_Files/<path:filename>')

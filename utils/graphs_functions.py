@@ -54,6 +54,10 @@ def graph_probabilty(criterias, data_total, probability_text, count):
                 
                 if criterias[i][0] != '':
 
+                    if criterias[i][1] == '':
+                            
+                            continue
+
                     match criterias[i][0]:
 
                         case 'seleccion':
