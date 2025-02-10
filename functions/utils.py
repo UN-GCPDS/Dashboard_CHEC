@@ -630,30 +630,34 @@ def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genéra
                         variable = variable_modificada
                 else:
                     variable = variable_modificada
-            memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
-            try:
-                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento "].iloc[0]
-            except:
-                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento"].iloc[0]
-            sugerencia=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Sugerencia"].iloc[0]
-            seccion_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Normativa"].iloc[0]
-            valor_variable=info_poligono[muestra]["top_5"][variable_original]
-            
-            # load from disk
-            vectorstore = Chroma(persist_directory=f"./embeddings_by_procces/{documento_buscar}",embedding_function=embeddings)
-            query=sugerencia+" "+seccion_buscar
+                
+            if variable in ["ALTITUD_mean","ALTITUD_median","ALTITUD_min","ALTITUD_max","ALTITUD_std","CORRIENTE_mean","CORRIENTE_median","CORRIENTE_min","CORRIENTE_max","CORRIENTE_std","TIPO_1_count","TIPO_2_count"]:
+                responses.append("\n")
+            else:
+                memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
+                try:
+                    documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento "].iloc[0]
+                except:
+                    documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Documento"].iloc[0]
+                sugerencia=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Sugerencia"].iloc[0]
+                seccion_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Normativa"].iloc[0]
+                valor_variable=info_poligono[muestra]["top_5"][variable_original]
+                
+                # load from disk
+                vectorstore = Chroma(persist_directory=f"./embeddings_by_procces/{documento_buscar}",embedding_function=embeddings)
+                query=sugerencia+" "+seccion_buscar
 
-            docs_variable=vectorstore.similarity_search(query,k=5) #Retriever
-            docs=docs+docs_variable
+                docs_variable=vectorstore.similarity_search(query,k=5) #Retriever
+                docs=docs+docs_variable
 
-            query=f"Generame una recomendación para la variable {variable}, la cual tiene un valor de {valor_variable}. {sugerencia}"
+                query=f"Generame una recomendación para la variable {variable}, la cual tiene un valor de {valor_variable}. {sugerencia}"
 
-            response=chain({"input_documents": docs, "human_input": query, "chat_history":memory}, #,"sugerencia":sugerencia},
-                    return_only_outputs=False) #AI answer
+                response=chain({"input_documents": docs, "human_input": query, "chat_history":memory}, #,"sugerencia":sugerencia},
+                        return_only_outputs=False) #AI answer
 
-            response = response['output_text']
+                response = response['output_text']
 
-            responses.append(response)
+                responses.append(response)
         
 
         docs_all=docs_all+docs
@@ -668,16 +672,15 @@ def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genéra
             pickle.dump(response, archivo)
     
     final_recommendation = "A continuación, se muestran las recomendaciones para cada equipo:\n\n"
-    print(type(info_poligono))
-    print(info_poligono)
-    print(list(info_poligono.keys()))
     for idx, resp in enumerate(responses, start=0):
-        print(idx, idx/5)
         if (idx==0 or idx==5 or idx==10):
           final_recommendation += "\n"
           final_recommendation += f"RECOMENDACIÓN PARA LAS VARIABLES DEL EQUIPO {info_poligono[list(info_poligono.keys())[int(idx/5)]]['Tipo_de_equipo'].upper()} CON ID {list(info_poligono.keys())[int(idx/5)]}: \n\n{resp}\n"
         else:
           final_recommendation+=f"\n{resp}\n"
+
+    if variable in ["ALTITUD_mean","ALTITUD_median","ALTITUD_min","ALTITUD_max","ALTITUD_std","CORRIENTE_mean","CORRIENTE_median","CORRIENTE_min","CORRIENTE_max","CORRIENTE_std","TIPO_1_count","TIPO_2_count"]:
+        final_recommendation+=f"\nDado que existe una posibilidad de que la interrupción esté provocada por una descarga eléctrica, se recomienda realizar inspecciones periódicas para detectar degradación en aisladores y equipos de protección, optimizar el sistema de puesta a tierra para disipar mejor la energía, y verificar la correcta coordinación de protecciones como reconectadores y pararrayos. Además, en zonas de alta incidencia de descargas, se sugiere reforzar el aislamiento y considerar la instalación de blindajes adicionales. La implementación de monitoreo en tiempo real y análisis de datos históricos facilitará la identificación de patrones y la planificación del mantenimiento preventivo. Finalmente, el uso de herramientas de predicción climática permitirá anticipar eventos críticos y tomar medidas proactivas para minimizar el impacto en la red de distribución.\n"
 
 
     if human_input == 'Genérame la recomendación':
@@ -689,7 +692,6 @@ def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genéra
         final_response==chain({"input_documents": docs_all, "human_input": query, "chat_history":memory}, #,"sugerencia":sugerencia},
                     return_only_outputs=False) #AI answer
         
-    print(final_response)
         
     return final_response
 

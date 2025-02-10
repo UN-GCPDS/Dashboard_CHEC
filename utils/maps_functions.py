@@ -560,7 +560,7 @@ def load_data():
     with open("./options/criterias_2.json", "w") as f:
         json.dump(options, f)
 
-    loaded_clf = torch.load(os.path.join("..", "data", "model.pth"))
+    loaded_clf = torch.load(os.path.join("..", "data", "model.pth"),weights_only=False)
 
     return trafos, apoyos, switches, redmt, super_eventos, descargas, vegetacion, df, df1, label_encoders, scolumns, NUMERIC_COLUMNS, max_values, loaded_clf
 
