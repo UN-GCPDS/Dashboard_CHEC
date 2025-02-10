@@ -488,7 +488,9 @@ def handle_url_update(select_evento_clicks, n_clicks_chat, n_clicks_graphs, n_cl
     if triggered_id == 'recomendacion-button' and select_evento_clicks:
         if (select_evento_clicks != evento_id) and (select_evento_clicks != None):
             evento_id = select_evento_clicks
-            get_recommendations(criticidad_data)
+            with open("equipos_filtrados.json", "r", encoding="utf-8") as archivo:
+                datos_cargados = json.load(archivo)
+            get_recommendations(datos_cargados)
             return "/chat_page"  # Cambia esto al pathname correspondiente
         
 

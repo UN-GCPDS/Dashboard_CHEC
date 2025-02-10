@@ -38,7 +38,7 @@ def create_combined_visualizations(mask, y_categorized, columns, SAIDI):
     fig = plt.figure(figsize=(25, 50))
 
     # Definir la disposición de los subplots
-    gs = fig.add_gridspec(4, 1, height_ratios=[1, 1, 1, 1], hspace=0.3)
+    gs = fig.add_gridspec(5, 1, height_ratios=[1, 1, 1, 1,1], hspace=0.3)
 
     # 1. Visualización de la máscara original
     ax1 = fig.add_subplot(gs[0])
@@ -56,11 +56,11 @@ def create_combined_visualizations(mask, y_categorized, columns, SAIDI):
     top_20_indices = np.argsort(column_relevance)[-20:]
     top_20_columns = columns[top_20_indices]
 
-    gs2 = gs[1].subgridspec(1, 4, wspace=0.3)
-    axes_violin = [fig.add_subplot(gs2[0, i]) for i in range(4)]
+    gs2 = gs[1].subgridspec(1, 5, wspace=0.3)
+    axes_violin = [fig.add_subplot(gs2[0, i]) for i in range(5)]
 
-    class_titles = ['todas las muestras', 'Riesgo Bajo', 'Riesgo Medio', 'Riesgo Alto']
-    class_indices = [0, 1, 2]
+    class_titles = ['todas las muestras', 'Riesgo Bajo', 'Riesgo Medio', 'Riesgo Alto','Riesgo Muy Alto']
+    class_indices = [0, 1, 2,3]
     colors = sns.color_palette("muted", len(top_20_columns))
 
     # Gráfica para todas las muestras
@@ -87,8 +87,8 @@ def create_combined_visualizations(mask, y_categorized, columns, SAIDI):
             axes_violin[i].set_axis_off()
 
     # 3. Gráficos de barras
-    gs3 = gs[2].subgridspec(1, 4, wspace=0.3)
-    axes_bar = [fig.add_subplot(gs3[0, i]) for i in range(4)]
+    gs3 = gs[2].subgridspec(1, 5, wspace=0.3)
+    axes_bar = [fig.add_subplot(gs3[0, i]) for i in range(5)]
 
     # Gráfica para todas las muestras
     top_20_relevance = column_relevance[top_20_indices]
@@ -98,8 +98,8 @@ def create_combined_visualizations(mask, y_categorized, columns, SAIDI):
     axes_bar[0].set_ylabel("Valores", fontsize=12)
     axes_bar[0].set_title("Todas las muestras", fontsize=14)
 
-    class_titles = ["Riesgo Bajo", "Riesgo Medio", "Riesgo Alto"]
-    for i, class_idx in enumerate([0, 1, 2]):
+    class_titles = ["Riesgo Bajo", "Riesgo Medio", "Riesgo Alto",'Riesgo Muy Alto']
+    for i, class_idx in enumerate([0, 1, 2,3]):
         ax_index = i + 1
         if np.any(y_categorized == class_idx):
             column_relevance = np.mean(mask[y_categorized == class_idx], axis=0)
@@ -113,6 +113,52 @@ def create_combined_visualizations(mask, y_categorized, columns, SAIDI):
         else:
             axes_bar[ax_index].text(0.5, 0.5, f'No hay datos para {class_titles[i]}', fontsize=14, ha='center')
             axes_bar[ax_index].set_axis_off()
+
+    # 4. Mapas de calor de correlación
+    mask_df = pd.DataFrame(normalized_mask, columns=columns)
+    top_20_columns_all = calculate_top_20_columns(normalized_mask, columns)
+    top_20_mask_df = mask_df[top_20_columns_all]
+
+    gs4 = gs[3].subgridspec(1, 5, wspace=0.3)
+    axes_heatmap = [fig.add_subplot(gs4[0, i]) for i in range(5)]
+
+    groups = {
+        "Total": top_20_mask_df,
+        "Riesgo Bajo": top_20_mask_df[y_categorized == 0],
+        "Riesgo Medio": top_20_mask_df[y_categorized == 1],
+        "Riesgo Alto": top_20_mask_df[y_categorized == 2],
+        "Riesgo Muy Alto": top_20_mask_df[y_categorized == 3],
+    }
+
+    for group_name, group_data in groups.items():
+        if 'SAIDI' not in group_data.columns:
+            groups[group_name] = group_data.copy()
+            groups[group_name]['SAIDI'] = SAIDI[group_data.index]
+
+    for i, (group_name, group_data) in enumerate(groups.items()):
+        top_20_corr = top_20_correlation(group_data)
+
+        if top_20_corr is not None:
+            sns.heatmap(
+                top_20_corr,
+                cmap="coolwarm",
+                ax=axes_heatmap[i],
+                cbar=i==3,
+                fmt=".2f",
+                vmin=-1,
+                vmax=1
+            )
+            axes_heatmap[i].set_title(f"{group_name}", fontsize=14)
+            axes_heatmap[i].tick_params(axis='x', rotation=90, labelsize=10)
+            axes_heatmap[i].tick_params(axis='y', labelsize=10)
+        else:
+            axes_heatmap[i].text(0.5, 0.5, 'No hay datos disponibles',
+                               horizontalalignment='center',
+                               verticalalignment='center',
+                               fontsize=16,
+                               color='red')
+            axes_heatmap[i].set_title(f"{group_name}", fontsize=14)
+            axes_heatmap[i].set_axis_off()
 
     # Ajustar el diseño final
     plt.tight_layout()
@@ -136,29 +182,29 @@ def top_20_correlation(data, reference_col='SAIDI'):
 
 def load_data():
 
-    mask = np.load("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/mask.npy")
+    mask = np.load(os.path.join("..", "data", "mask.npy"))
     
-    trafos = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/TRAFOS_1.pkl")
+    trafos = pd.read_pickle(os.path.join("..", "data", "TRAFOS.pkl"))
     trafos['FECHA']=pd.to_datetime(trafos['FECHA'])
     trafos['FECHA_C']=trafos['FECHA'].dt.to_period('M')
     trafos.rename(columns={'CODE':'equipo_ope'}, inplace=True)
 
-    apoyos = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/APOYOS_1.pkl")
+    apoyos = pd.read_pickle(os.path.join("..", "data", "APOYOS.pkl"))
     apoyos['FECHA']=pd.to_datetime(apoyos['FECHA'])
     apoyos['FECHA_C']=apoyos['FECHA'].dt.to_period('M')
     apoyos.rename(columns={'CODE':'equipo_ope'}, inplace=True)
 
-    redmt = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/REDMT_1.pkl")
+    redmt = pd.read_pickle(os.path.join("..", "data", "REDMT.pkl"))
     redmt['FECHA']=pd.to_datetime(redmt['FECHA'])
     redmt['FECHA_C']=redmt['FECHA'].dt.to_period('M')
     redmt.rename(columns={'CODE':'equipo_ope'}, inplace=True)
 
-    switches = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/SWITCHES_1.pkl")
+    switches = pd.read_pickle(os.path.join("..", "data", "SWITCHES.pkl"))
     switches['FECHA']=pd.to_datetime(switches['FECHA'])
     switches['FECHA_C']=switches['FECHA'].dt.to_period('M')
     switches.rename(columns={'CODE':'equipo_ope'}, inplace=True)
 
-    Xdata = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/SuperEventos_Criticidad_AguasAbajo.pkl")
+    Xdata = pd.read_pickle(os.path.join("..", "data", "SuperEventos_Criticidad_AguasAbajo_CODEs.pkl"))
     Xdata = Xdata[Xdata['duracion_h'] <= 100]
 
     # Extraer variables objetivo
@@ -170,13 +216,14 @@ def load_data():
                 'h4-solar_rad', 'h4-uv', 'h5-solar_rad', 'h5-uv', 'h19-solar_rad', 'h19-uv', 'h20-solar_rad', 'h20-uv',
                 'h21-solar_rad', 'h21-uv', 'h22-solar_rad', 'h22-uv', 'h23-solar_rad', 'h23-uv', 'evento', 'fin', 'inicio',
                 'cnt_usus', 'DEP', 'MUN', 'FECHA', 'NIVEL_C', 'VALOR_C', 'TRAMOS_AGUAS_ABAJO', 'EQUIPOS_PUNTOS',
-                'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C'],
+                'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C','TRAMOS_AGUAS_ABAJO_CODES','ORDER_'],
             inplace=True, axis=1)
 
     # Definir la variable objetivo y eliminarla del conjunto de características
     target = ['SAIFI', 'SAIDI', 'duracion_h']
     y1 = Xdata[target].values
     Xdata.drop(target, axis=1, inplace=True)
+    y1=y1[:,0:1]
 
     # Preparar datos
     y = y1.astype('float32')

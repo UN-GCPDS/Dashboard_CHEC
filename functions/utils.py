@@ -91,6 +91,7 @@ def load_previous_conversations():
         try:
             with open(CHAT_DATA_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
+            
         except json.JSONDecodeError:
             # Si el archivo está corrupto, retorna estructura vacía
             return {'chats': {}, 'current_chat_id': None}
@@ -98,6 +99,7 @@ def load_previous_conversations():
         return {'chats': {}, 'current_chat_id': None}
 
 def save_conversations(data):
+    print("Guardando datos en el archivo JSON...")
     with open(CHAT_DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
@@ -271,7 +273,7 @@ def get_structure_graph_recomendation(info_poligono):
     ids_equipos=list(info_poligono.keys())
     for id in ids_equipos:
         tipo_equipo=info_poligono[id]["Tipo_de_equipo"]
-        variables_recomendacion=pd.read_excel(f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_{tipo_equipo}.xlsx")
+        variables_recomendacion=pd.read_excel(os.path.join("..", "data", "arbol_decision_recomendaciones", f"variables_{tipo_equipo}.xlsx"))
         variables_por_equipo[tipo_equipo+"_"+id]=[]
         normativas_por_equipo[tipo_equipo+"_"+id]={}
         documentos_por_equipo[tipo_equipo+"_"+id]={}
@@ -587,7 +589,7 @@ def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genéra
             
             chain.memory=memory'''
         tipo_equipo=info_poligono[muestra]["Tipo_de_equipo"]
-        variables_recomendacion=pd.read_excel(f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_{tipo_equipo}.xlsx")
+        variables_recomendacion=pd.read_excel(os.path.join("..", "data", "arbol_decision_recomendaciones", f"variables_{tipo_equipo}.xlsx"))
         docs=[]
         partes=[]
         for variable in info_poligono[muestra]["top_5"].keys():
@@ -636,8 +638,9 @@ def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genéra
             sugerencia=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Sugerencia"].iloc[0]
             seccion_buscar=variables_recomendacion[variables_recomendacion["Variables"]==variable]["Normativa"].iloc[0]
             valor_variable=info_poligono[muestra]["top_5"][variable_original]
+            
             # load from disk
-            vectorstore = Chroma(persist_directory=f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/Dashboard_CHEC/embeddings_by_procces/{documento_buscar}",embedding_function=embeddings)
+            vectorstore = Chroma(persist_directory=f"./embeddings_by_procces/{documento_buscar}",embedding_function=embeddings)
             query=sugerencia+" "+seccion_buscar
 
             docs_variable=vectorstore.similarity_search(query,k=5) #Retriever
@@ -696,7 +699,8 @@ def recomendacion_apoyos(model:str, chat_id:str,data_equipo:dict,human_input='Ge
     instruction="Basándote en el contexto normativo, los valores proporcionados y la sugerencia, por favor proporciona una recomendación detallada y justificada sobre la variable"
     variable_recomendacion=data_equipo["Variable_Recomendacion"]
     #variables_recomendacion_apoyos=pd.read_excel("C:/Users/spine/Downloads/variables_apoyos.xlsx")
-    variables_recomendacion_apoyos=pd.read_excel("c:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_apoyos.xlsx")
+    
+    variables_recomendacion_apoyos=pd.read_excel(os.path.join("..", "data", "arbol_decision_recomendaciones", "variables_apoyos.xlsx"))
     sugerencia=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Sugerencia"].iloc[0]
     seccion_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Normativa"].iloc[0]
     documento_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Documento "].iloc[0]
@@ -755,7 +759,8 @@ def recomendacion_apoyos(model:str, chat_id:str,data_equipo:dict,human_input='Ge
 
     embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
     # load from disk
-    vectorstore = Chroma(persist_directory=f"C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/Dashboard_CHEC/embeddings_by_procces/{documento_buscar}",embedding_function=embeddings)
+    
+    vectorstore = Chroma(persist_directory=f"./embeddings_by_procces/{documento_buscar}",embedding_function=embeddings)
     
     if human_input == 'Génerame la recomendación':
         query =sugerencia+" "+seccion_buscar
@@ -791,7 +796,8 @@ def recomendacion_switches(model:str, chat_id:str,data_equipo:dict,human_input='
 
     instruction="Basándote en el contexto normativo, los valores proporcionados y la sugerencia, por favor proporciona una recomendación detallada y justificada sobre la variable"
     variable_recomendacion=data_equipo["Variable_Recomendacion"]
-    variables_recomendacion_apoyos=pd.read_excel("c:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_switches.xlsx")
+    
+    variables_recomendacion_apoyos=pd.read_excel(os.path.join("..", "data", "arbol_decision_recomendaciones", "variables_switches.xlsx"))
     sugerencia=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Sugerencia"].iloc[0]
     seccion_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Seccion_switches"].iloc[0]
     valores_variable=json.dumps(data_equipo["Variable_Valores"])
@@ -895,7 +901,7 @@ def recomendacion_tramo_red(model:str, chat_id:str,data_equipo:dict,human_input=
 
     instruction="Basándote en el contexto normativo, los valores proporcionados y la sugerencia, por favor proporciona una recomendación detallada y justificada sobre la variable"
     variable_recomendacion=data_equipo["Variable_Recomendacion"]
-    variables_recomendacion_apoyos=pd.read_excel("c:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_tramo_red.xlsx")
+    variables_recomendacion_apoyos=pd.read_excel(os.path.join("..", "data", "arbol_decision_recomendaciones", "variables_tramo_red.xlsx"))
     sugerencia=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Sugerencia"].iloc[0]
     seccion_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Seccion_tramo_red"].iloc[0]
     valores_variable=json.dumps(data_equipo["Variable_Valores"])
@@ -1012,7 +1018,7 @@ def recomendacion_transformadores(model:str, chat_id:str,data_equipo:dict,human_
 
     instruction="Basándote en el contexto normativo, los valores proporcionados y la sugerencia, por favor proporciona una recomendación detallada y justificada sobre la variable"
     variable_recomendacion=data_equipo["Variable_Recomendacion"]
-    variables_recomendacion_apoyos=pd.read_excel("c:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/arbol_decision_recomendaciones/variables_transformadores.xlsx")
+    variables_recomendacion_apoyos=pd.read_excel(os.path.join("..", "data", "arbol_decision_recomendaciones", "variables_transformadores.xlsx"))
     sugerencia=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Sugerencia"].iloc[0]
     seccion_buscar=variables_recomendacion_apoyos[variables_recomendacion_apoyos["Variables"]==variable_recomendacion]["Seccion_transformadores"].iloc[0]
     valores_variable=json.dumps(data_equipo["Variable_Valores"])
@@ -1114,61 +1120,59 @@ def recomendacion_transformadores(model:str, chat_id:str,data_equipo:dict,human_
 
 def get_recommendations(data_equipo):
 
-    with open('./chat_data.json', 'r', encoding='utf-8') as archivo:
-        data = json.load(archivo)
-    nueva_data = data.copy()
+    
+
+    # 1. Leer datos una sola vez al inicio
+    if os.path.exists(CHAT_DATA_FILE):
+        with open(CHAT_DATA_FILE, 'r', encoding='utf-8') as archivo:
+            try:
+                data = json.load(archivo)
+            except json.JSONDecodeError:
+                print("Error: El archivo JSON está corrupto o vacío. Inicializando datos.")
+                data = {"chats": {}, "current_chat_id": None}
+    else:
+        data = {"chats": {}, "current_chat_id": None}
+
+    # 2. Inicializar nuevo chat
     new_chat_id = f'chat-{len(data["chats"])}'
-    nueva_data['chats'][new_chat_id] = {'nombre': None, 'mensajes': [], 'files': []}
-    nueva_data['current_chat_id'] = new_chat_id
-    # Guardar las conversaciones actualizadas
-    save_conversations(nueva_data)
+    data['chats'][new_chat_id] = {'nombre': new_chat_id, 'mensajes': [], 'files': []}
+    data['current_chat_id'] = new_chat_id
 
-
-    with open('./chat_data.json', 'r', encoding='utf-8') as archivo:
-        data = json.load(archivo)
-    nueva_data = data.copy()
-    chat_id = nueva_data['current_chat_id']
-
-    # Guardar la variable en un archivo JSON 
-    with open('./body_recommendations/'+str(chat_id)+'.json', 'w') as json_file: 
+    # 3. Guardar datos del equipo
+    os.makedirs('./body_recommendations', exist_ok=True)
+    with open(f'./body_recommendations/{new_chat_id}.json', 'w') as json_file:
         json.dump(data_equipo, json_file)
 
-    # Agregar mensaje del usuario y marcar que necesita respuesta
+    # 4. Agregar mensaje del usuario
     mensaje_user = {
         'autor': 'Tú',
         'texto': "",
         'needs_response': True,
-        'modelo': "gpt",      # Guardar el modelo seleccionado
-        'proceso': "recomendacion"     # Guardar el proceso seleccionado
+        'modelo': "gpt",
+        'proceso': "recomendacion"
     }
-    nueva_data['chats'][chat_id]['mensajes'].append(mensaje_user)
+    data['chats'][new_chat_id]['mensajes'].append(mensaje_user)
 
-    # Si es el primer mensaje del usuario, asignar el nombre del chat
-    if nueva_data['chats'][chat_id]['nombre'] is None:
-        words = "".split()
-        topic = ' '.join(words[:5]) if len(words) >= 5 else ""
-        nueva_data['chats'][chat_id]['nombre'] =  chat_id  # Puedes personalizar el nombre según tu lógica
+    # 5. Guardar estado intermedio
+    save_conversations(data)  # Guarda el estado antes de agregar la respuesta
 
-    nuevo_valor_entrada = ''
+    # 6. Agregar respuesta del asistente
+    respuesta_asistente = {
+        'autor': 'Asistente',
+        'texto': recomendacion('gpt', new_chat_id, data_equipo)
+    }
+    data['chats'][new_chat_id]['mensajes'].append(respuesta_asistente)
+    data['chats'][new_chat_id]['mensajes'][-2]['needs_response'] = False
 
-    # Guardar las conversaciones actualizadas
-    save_conversations(nueva_data)
+    # 7. Verificar antes de guardar
+    print("Datos a guardar en el archivo JSON:")
+    print(json.dumps(data, ensure_ascii=False, indent=4))
 
-
-    with open('./chat_data.json', 'r', encoding='utf-8') as archivo:
-        data = json.load(archivo)
-    chat_id = data.get('current_chat_id')
-    mensajes=data["chats"][chat_id]["mensajes"]
-    last_message=mensajes[-1]
-    mensaje_usuario=last_message["texto"]
-
-    respuesta_asistente = {'autor': 'Asistente', 'texto': recomendacion('gpt', chat_id, data_equipo)}
-
-    data['chats'][chat_id]['mensajes'].append(respuesta_asistente)
-
-    last_message["needs_response"]=False
-
+    # 8. Guardar estado final
     save_conversations(data)
+    numero = 1 
+    with open('./options/count_chat.json', 'w') as archivo_json:
+        json.dump(numero, archivo_json)
 
 
     

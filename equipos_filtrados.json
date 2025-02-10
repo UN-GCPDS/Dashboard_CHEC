@@ -1,0 +1,24 @@
+{
+    "B38003": {
+        "Tipo_de_equipo": "apoyo",
+        "top_5": {
+            "h10-slp": "1016.0",
+            "h9-solar_rad": "593.0",
+            "h15-wind_gust_spd": "7.2"
+        }
+    },
+    "B2446": {
+        "Tipo_de_equipo": "apoyo",
+        "top_5": {
+            "h10-slp": "1016.0"
+        }
+    },
+    "E31437": {
+        "Tipo_de_equipo": "apoyo",
+        "top_5": {
+            "h10-slp": "1016.0",
+            "h9-solar_rad": "593.0",
+            "h15-wind_gust_spd": "7.2"
+        }
+    }
+}

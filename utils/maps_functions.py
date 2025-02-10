@@ -79,7 +79,7 @@ def my_r2_score_fn(y_pred, y_true):
     total_variance = torch.var(y_true, unbiased=False)
     unexplained_variance = torch.mean((y_true - y_pred) ** 2)
     r2_score = 1 - (unexplained_variance / total_variance)
-    return r2_score
+    return 1-r2_score
 
 # Clase personalizada para TabNetRegressor
 class CustomTabNetRegressor(TabNetRegressor):
@@ -110,6 +110,68 @@ par = {
     'virtual_batch_size': 1024, 'optimizer_type': 'rmsprop',
     'p': 0.9806570564809924
 }
+
+reglas_equipo = {
+    "apoyo": {
+        "permitidos": {
+            "MATERIAL", "LONG_APOYO", "TIERRA_PIE", "VIENTO",
+            "ÍNDICE_RAYOS", "PRECIPITACIÓN", "RADIACIÓN_UV", "TEMPERATURA"
+        },
+        "keywords": {"temp", "solar_rad", "uv", "wind_gust_spd", "wind_spd"}
+    },
+    "switch": {
+        "permitidos": {
+            "KV", "PHASES", "STATE", "VELOCIDAD_VIENTO",
+            "TEMPERATURA_AMBIENTE", "PRECIPITACIÓN",
+            "HUMEDAD_RELATIVA", "RAYOS"
+        },
+        "keywords": {"rh", "temp", "wind_gust_spd", "wind_spd"}
+    },
+    "tramo_red": {
+        "permitidos": {
+            "KVNOM", "MATERIALCONDUCTOR", "CALIBRECONDUCTOR",
+            "GUARDACONDUCTOR", "VELOCIDAD_VIENTO", "TEMPERATURA",
+            "HUMEDAD_RELATIVA", "PRECIPITACIÓN"
+        },
+        "keywords": {"wind_gust_spd", "wind_spd", "rh"}
+    },
+    "transformador": {
+        "permitidos": {
+            "KVA", "KV1", "IMPEDANCE", "Temperatura",
+            "Humedad", "Aceite Aislante"
+        },
+        "keywords": {"temp", "rh"}
+    }
+}
+
+def procesar_json(entrada_json):
+    resultado = {}
+
+    for codigo, datos in entrada_json.items():
+        tipo_equipo = datos["Tipo_de_equipo"]
+        top_10 = datos["top_5"]
+
+        if tipo_equipo in reglas_equipo:
+            reglas = reglas_equipo[tipo_equipo]
+            nuevo_top = {}
+
+            for clave, valor in top_10.items():
+                # Verificar si la clave está permitida o contiene una keyword
+                if clave in reglas["permitidos"] or any(kw in clave for kw in reglas["keywords"]):
+                    nuevo_top[clave] = valor
+
+            # Si hay más de 5 elementos, conservar solo los primeros 5
+            nuevo_top = dict(list(nuevo_top.items())[:5])
+
+            resultado[codigo] = {
+                "Tipo_de_equipo": tipo_equipo,
+                "top_5": nuevo_top
+            }
+        else:
+            # Si el tipo de equipo no tiene reglas, se guarda sin cambios
+            resultado[codigo] = datos
+
+    return resultado
 
 def graficar_grafo_interactivo_2(Z, nombres_columnas, num=0, height=400, width=70, iteraciones=20, vector=None):
     """
@@ -176,6 +238,7 @@ def graficar_grafo_interactivo_2(Z, nombres_columnas, num=0, height=400, width=7
     
     return net
 
+
 def process_dataframe(redmt, df, label_encoders, df1, ind,tip,s,scolumns, NUMERIC_COLUMNS, max_values):
     """
     Procesa un DataFrame `redmt` usando coordenadas y LabelEncoders, y devuelve un DataFrame resultante.
@@ -190,10 +253,6 @@ def process_dataframe(redmt, df, label_encoders, df1, ind,tip,s,scolumns, NUMERI
     Returns:
         pd.DataFrame: DataFrame resultante con los datos procesados.
     """
-    target = ['SAIFI', 'SAIDI', 'duracion_h']
-    redmt['FECHA']=pd.to_datetime(redmt['FECHA'])
-    redmt['FECHA_C']=redmt['FECHA'].dt.to_period('M')
-    redmt.rename(columns={'CODE':'equipo_ope'}, inplace=True)
     # Convertir las columnas de fecha
     df1['inicio'] = pd.to_datetime(df1['inicio'])
     df1['FECHA_C'] = df1['inicio'].dt.to_period('M')
@@ -209,21 +268,27 @@ def process_dataframe(redmt, df, label_encoders, df1, ind,tip,s,scolumns, NUMERI
 
     # Extraer las listas de coordenadas y equipos desde la fila de interés
     if s==0:
-        aux = eval(row_of_interest.loc[ind, 'TRAMOS_AGUAS_ABAJO'])
+        #aux = eval(row_of_interest.loc[ind, 'TRAMOS_AGUAS_ABAJO'])
+        aux=  list(eval(row_of_interest.loc[ind,'TRAMOS_AGUAS_ABAJO_CODES']))
     else:
         aux = eval(row_of_interest.loc[ind, 'EQUIPOS_PUNTOS'])
+
 
     # DataFrame para almacenar las nuevas filas
     new_rows = []
     # Iterar sobre cada elemento de `aux` para filtrar y duplicar
     for i in aux:
         # Filtrar `redmt` según las condiciones dadas
-
-        filtered_row = redmt[
-            (redmt['FECHA_C'] == row_of_interest.loc[ind, 'FECHA_C']) &
-            (redmt['LATITUD'] == i[0]) &
-            (redmt['LONGITUD'] == i[1])
-        ]
+        if s==0:
+          filtered_row = redmt[
+              (redmt['FECHA_C'] == row_of_interest.loc[ind, 'FECHA_C']) &
+              (redmt['equipo_ope']== i)
+          ]
+        else:
+          filtered_row = redmt[
+              (redmt['FECHA_C'] == row_of_interest.loc[ind, 'FECHA_C']) &
+              (redmt['LATITUD'] == i[0]) &
+              (redmt['LONGITUD'] == i[1])]
         #print('2',filtered_row[['LATITUD','LONGITUD']].values)
         # Si hay filas que cumplen la condición, reemplazar columnas en la fila de interés
         if not filtered_row.empty:
@@ -232,8 +297,8 @@ def process_dataframe(redmt, df, label_encoders, df1, ind,tip,s,scolumns, NUMERI
                 # Crear una copia de la fila de interés y reemplazar las columnas correspondientes
                 temp_row = row_of_interest.copy()
                 temp_row[redmt.columns] = row.values  # Reemplaza las columnas de redmt
-                temp_row['LATITUD'] = np.float64(i[0])  # Asegura precisión en la asignación
-                temp_row['LONGITUD'] = np.float64(i[1])
+                #temp_row['LATITUD'] = np.float64(i[0])  # Asegura precisión en la asignación
+                #temp_row['LONGITUD'] = np.float64(i[1])
                 new_rows.append(temp_row)
     if not new_rows:
         # Retornar un DataFrame vacío con las columnas esperadas
@@ -242,12 +307,13 @@ def process_dataframe(redmt, df, label_encoders, df1, ind,tip,s,scolumns, NUMERI
             'h4-solar_rad', 'h4-uv', 'h5-solar_rad', 'h5-uv', 'h19-solar_rad', 'h19-uv', 'h20-solar_rad', 'h20-uv',
             'h21-solar_rad', 'h21-uv', 'h22-solar_rad', 'h22-uv', 'h23-solar_rad', 'h23-uv', 'evento', 'fin', 'inicio',
             'cnt_usus', 'DEP', 'MUN', 'FECHA', 'NIVEL_C', 'VALOR_C', 'TRAMOS_AGUAS_ABAJO', 'EQUIPOS_PUNTOS',
-            'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C'],
+            'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C','TRAMOS_AGUAS_ABAJO_CODES','ORDER_'],
            inplace=True, axis=1)
-        aux1.drop(target, axis=1, inplace=True)
+        aux1.drop(['SAIFI', 'SAIDI', 'duracion_h'], axis=1, inplace=True)
         return pd.DataFrame(columns=scolumns).values,aux1
     # Concatenar todas las nuevas filas generadas
     result_df = pd.concat(new_rows, ignore_index=True)
+    result_df.drop_duplicates(inplace=True)
     result_df['LATITUD'] = result_df['LATITUD'].astype('float64')
     result_df['LONGITUD'] = result_df['LONGITUD'].astype('float64')
     result_df1 =result_df.copy()
@@ -302,16 +368,18 @@ def process_dataframe(redmt, df, label_encoders, df1, ind,tip,s,scolumns, NUMERI
             'h4-solar_rad', 'h4-uv', 'h5-solar_rad', 'h5-uv', 'h19-solar_rad', 'h19-uv', 'h20-solar_rad', 'h20-uv',
             'h21-solar_rad', 'h21-uv', 'h22-solar_rad', 'h22-uv', 'h23-solar_rad', 'h23-uv', 'evento', 'fin', 'inicio',
             'cnt_usus', 'DEP', 'MUN', 'FECHA', 'NIVEL_C', 'VALOR_C', 'TRAMOS_AGUAS_ABAJO', 'EQUIPOS_PUNTOS',
-            'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C'],
+            'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C','TRAMOS_AGUAS_ABAJO_CODES','ORDER_'],
            inplace=True, axis=1)
-    result_df.drop(target, axis=1, inplace=True)
+    result_df.drop(['SAIFI', 'SAIDI', 'duracion_h'], axis=1, inplace=True)
     result_df1.drop(['inicio_evento', 'h0-solar_rad', 'h0-uv', 'h1-solar_rad', 'h1-uv', 'h2-solar_rad', 'h2-uv', 'h3-solar_rad', 'h3-uv',
             'h4-solar_rad', 'h4-uv', 'h5-solar_rad', 'h5-uv', 'h19-solar_rad', 'h19-uv', 'h20-solar_rad', 'h20-uv',
             'h21-solar_rad', 'h21-uv', 'h22-solar_rad', 'h22-uv', 'h23-solar_rad', 'h23-uv', 'evento', 'fin', 'inicio',
             'cnt_usus', 'DEP', 'MUN', 'FECHA', 'NIVEL_C', 'VALOR_C', 'TRAMOS_AGUAS_ABAJO', 'EQUIPOS_PUNTOS',
-            'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C'],
+            'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C','TRAMOS_AGUAS_ABAJO_CODES','ORDER_'],
            inplace=True, axis=1)
-    result_df1.drop(target, axis=1, inplace=True)
+    result_df1.drop(['SAIFI', 'SAIDI', 'duracion_h'], axis=1, inplace=True)
+    result_df1.drop_duplicates(inplace=True)
+    result_df.drop_duplicates(inplace=True)
     return result_df.values,result_df1
 
 def enumerate_repeated_from_startup(lista):
@@ -378,19 +446,31 @@ def select_data(año,mes,mun,trafos,apoyos,switches,redmt,super_eventos, descarg
 
 def load_data():
 
-    trafos = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/TRAFOS_1.pkl")
+    trafos = pd.read_pickle(os.path.join("..", "data", "TRAFOS.pkl"))
+    trafos['FECHA']=pd.to_datetime(trafos['FECHA'])
+    trafos['FECHA_C']=trafos['FECHA'].dt.to_period('M')
+    trafos.rename(columns={'CODE':'equipo_ope'}, inplace=True)
 
-    apoyos = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/APOYOS_1.pkl")
+    apoyos = pd.read_pickle(os.path.join("..", "data", "APOYOS.pkl"))
+    apoyos['FECHA']=pd.to_datetime(apoyos['FECHA'])
+    apoyos['FECHA_C']=apoyos['FECHA'].dt.to_period('M')
+    apoyos.rename(columns={'CODE':'equipo_ope'}, inplace=True)
 
-    redmt = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/REDMT_1.pkl")
+    redmt = pd.read_pickle(os.path.join("..", "data", "REDMT.pkl"))
+    redmt['FECHA']=pd.to_datetime(redmt['FECHA'])
+    redmt['FECHA_C']=redmt['FECHA'].dt.to_period('M')
+    redmt.rename(columns={'CODE':'equipo_ope'}, inplace=True)
 
-    switches = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/SWITCHES_1.pkl")
+    switches = pd.read_pickle(os.path.join("..", "data", "SWITCHES.pkl"))
+    switches['FECHA']=pd.to_datetime(switches['FECHA'])
+    switches['FECHA_C']=switches['FECHA'].dt.to_period('M')
+    switches.rename(columns={'CODE':'equipo_ope'}, inplace=True)
 
-    super_eventos = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/SuperEventos_Criticidad_AguasAbajo.pkl")
+    super_eventos = pd.read_pickle(os.path.join("..", "data", "SuperEventos_Criticidad_AguasAbajo_CODEs.pkl"))
 
-    descargas = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/Rayos.pkl")
+    descargas = pd.read_pickle(os.path.join("..", "data", "Rayos.pkl"))
 
-    vegetacion = pd.read_pickle("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/Vegetacion.pkl")
+    vegetacion = pd.read_pickle(os.path.join("..", "data", "Vegetacion.pkl"))
 
     Xdata = super_eventos.copy()
     Xdata = Xdata[Xdata['duracion_h'] <= 100]
@@ -404,14 +484,14 @@ def load_data():
                 'h4-solar_rad', 'h4-uv', 'h5-solar_rad', 'h5-uv', 'h19-solar_rad', 'h19-uv', 'h20-solar_rad', 'h20-uv',
                 'h21-solar_rad', 'h21-uv', 'h22-solar_rad', 'h22-uv', 'h23-solar_rad', 'h23-uv', 'evento', 'fin', 'inicio',
                 'cnt_usus', 'DEP', 'MUN', 'FECHA', 'NIVEL_C', 'VALOR_C', 'TRAMOS_AGUAS_ABAJO', 'EQUIPOS_PUNTOS',
-                'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C'],
+                'PUNTOS_POLIGONO', 'LONGITUD2', 'LATITUD2', 'FECHA_C','TRAMOS_AGUAS_ABAJO_CODES','ORDER_'],
             inplace=True, axis=1)
 
     # Definir la variable objetivo y eliminarla del conjunto de características
     target = ['SAIFI', 'SAIDI', 'duracion_h']
     y1 = Xdata[target].values
     Xdata.drop(target, axis=1, inplace=True)
-
+    y1=y1[:,0:1]
     df = Xdata.copy()
 
     # Identificar columnas numéricas y categóricas
@@ -453,7 +533,7 @@ def load_data():
 
     # Crear categorías basadas en percentiles
     percentiles = np.percentile(y[:, 0], [33.33, 66.66])
-    y_categorized = np.digitize(y[:, 0:1].flatten(), bins=percentiles).astype(int)
+    y_categorized = df1['NIVEL_C'].values#np.digitize(y[:, 0:1].flatten(), bins=percentiles).astype(int)
 
     # Escalar la variable objetivo
     scaler = MinMaxScaler()
@@ -464,7 +544,7 @@ def load_data():
         X, y_scaled, test_size=0.2, random_state=42, stratify=y_categorized)
 
     # Dividir entrenamiento en entrenamiento y validación
-    percentiles_t = np.percentile(y_train[:, 0], [33.33, 66.66])
+    percentiles_t = np.percentile(y_train[:, 0], [25, 50,75])
     y_categorized_t = np.digitize(y_train[:, 0:1].flatten(), bins=percentiles_t).astype(int)
     X_train, X_valid, y_train, y_valid = train_test_split(
         X_train, y_train, test_size=0.2, random_state=42, stratify=y_categorized_t)
@@ -480,7 +560,7 @@ def load_data():
     with open("./options/criterias_2.json", "w") as f:
         json.dump(options, f)
 
-    loaded_clf = torch.load("C:/Users/lucas/OneDrive - Universidad Nacional de Colombia/PC-GCPDS/Documentos/data/model.pth")
+    loaded_clf = torch.load(os.path.join("..", "data", "model.pth"))
 
     return trafos, apoyos, switches, redmt, super_eventos, descargas, vegetacion, df, df1, label_encoders, scolumns, NUMERIC_COLUMNS, max_values, loaded_clf
 
@@ -881,16 +961,17 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
        # Crear la leyenda HTML
         legend_html = """
         <div style="position: fixed; 
-                    top: 15px; right: 10px; width: 110px; height: 160px; 
-                    background-color: white; border:2px solid black; 
-                    z-index:9999; font-size:12px; padding: 8px; opacity: 0.7;">
-            <i style="background-color:blue; width: 15px; height: 15px; display: inline-block;"></i> Apoyos<br>
-            <i style="background-color:green; width: 15px; height: 15px; display: inline-block;"></i> Trafos<br>
-            <i style="background-color:purple; width: 15px; height: 15px; display: inline-block;"></i> Switches<br>
-            <i style="background-color:black; width: 15px; height: 15px; display: inline-block;"></i> Red MT<br>
-            <i style="background-color:yellow; width: 15px; height: 15px; display: inline-block;"></i> CR baja<br>
-            <i style="background-color:orange; width: 15px; height: 15px; display: inline-block;"></i> CR media<br>
-            <i style="background-color:red; width: 15px; height: 15px; display: inline-block;"></i> CR alta<br>
+                    top: 15px; right: 10px; width: 135px; height: 170px; 
+                background-color: white; border:2px solid black; 
+                z-index:9999; font-size:12px; padding: 8px; opacity: 0.7;">
+        <i style="background-color:blue; width: 15px; height: 15px; display: inline-block;"></i> Apoyos<br>
+        <i style="background-color:green; width: 15px; height: 15px; display: inline-block;"></i> Trafos<br>
+        <i style="background-color:purple; width: 15px; height: 15px; display: inline-block;"></i> Switches<br>
+        <i style="background-color:black; width: 15px; height: 15px; display: inline-block;"></i> Red MT<br>
+        <i style="background-color:green; width: 15px; height: 15px; display: inline-block;"></i> CR baja<br>
+        <i style="background-color:yellow; width: 15px; height: 15px; display: inline-block;"></i> CR media<br>
+        <i style="background-color:orange; width: 15px; height: 15px; display: inline-block;"></i> CR alta<br>
+        <i style="background-color:red; width: 15px; height: 15px; display: inline-block;"></i> CR muy alta<br>
         </div>
         """
 
@@ -906,8 +987,10 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
             # Dibuja el polígono en el mapa
             match df['NIVEL_C'].values[0]:
                 case 0:
-                    color = 'yellow'
+                    color = 'green'
                 case 1:
+                    color = 'yellow'
+                case 2:
                     color = 'orange'
                 case _:
                     color = 'red'
@@ -1024,7 +1107,6 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
     pos_latitud = columnas.index('LATITUD') if 'LATITUD' in columnas else None
     pos_longitud = columnas.index('LONGITUD') if 'LONGITUD' in columnas else None
     a_df=pd.concat((a1_df,a2_df,a3_df,a4_df),ignore_index=True)
-
     aux_eq=[]
     # Iterar sobre las 3 muestras más relevantes
     for idx, muestra_idx in enumerate(top_3_indices):
@@ -1052,12 +1134,18 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
             allowed_columns = set(df.columns).difference(set(trafos_seleccionado.columns)).difference(set(switches_seleccionado.columns)).difference(set(apoyos_seleccionado.columns))
         elif tipo_equipo=='transformador':
             allowed_columns = set(df.columns).difference(set(switches_seleccionado.columns)).difference(set(redmt_seleccionado.columns)).difference(set(apoyos_seleccionado.columns))
+        be=filtered_variables = {k: v for k, v in temp_variables.items() if k in allowed_columns}
 
-        filtered_variables = {k: v for k, v in temp_variables.items() if k in allowed_columns}
+        # Eliminar solo las claves cuyos valores sean NaN, None o cadenas vacías
+        filtered_variables = {
+        k: v for k, v in filtered_variables.items()
+        if not math.isnan(v)
+        }
+
         #filtered_variables = {k: v for k, v in filtered_variables.items() if isinstance(v, (int, float)) and not math.isnan(v)}
         resultados[f'muestra_{idx+1}'] = {
             'tipo_equipo': tipo_equipo,
-            'top_5_variables': dict(list(filtered_variables.items())[:5]),  # Top 10 relevantes después del filtro
+            'top_5_variables': dict(list(filtered_variables.items())[:10]),  # Top 10 relevantes después del filtro
             'posición': (a[muestra_idx, pos_latitud], a[muestra_idx, pos_longitud])
         }
 
@@ -1066,10 +1154,29 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
         resultado.append([switches_seleccionado.loc[(switches_seleccionado['LATITUD'] == info['posición'][0]) & (switches_seleccionado['LONGITUD'] == info['posición'][1]), 'equipo_ope'].unique(),'switch'])
         resultado.append([apoyos_seleccionado.loc[(apoyos_seleccionado['LATITUD'] == info['posición'][0]) & (apoyos_seleccionado['LONGITUD'] == info['posición'][1]), 'equipo_ope'].unique(),'apoyo'])
         resultado.append([trafos_seleccionado.loc[(trafos_seleccionado['LATITUD'] == info['posición'][0]) & (trafos_seleccionado['LONGITUD'] == info['posición'][1]), 'equipo_ope'].unique(),'transformador'])
+        resultado.append([redmt_seleccionado.loc[(redmt_seleccionado['LATITUD'] == info['posición'][0]) & (redmt_seleccionado['LONGITUD'] == info['posición'][1]), 'equipo_ope'].unique(),'tramo_red'])
     
     equipos_criticos = [item for item in resultado if item[0].size > 0]
     codigo_equipos_criticos = [item[0][0] for item in equipos_criticos]
     tipo_equipos_criticos = [item[1] for item in equipos_criticos] 
+
+    # Construcción del diccionario con strings
+    resultado_dict = {}
+
+    for (muestra, info), codigo in zip(resultados.items(), codigo_equipos_criticos):
+        resultado_dict[codigo] = {
+            "Tipo_de_equipo": info["tipo_equipo"],
+            "top_5": {clave: str(valor) for clave, valor in info["top_5_variables"].items()}  # Convertir valores a string
+        }
+
+
+    # Procesar el JSON
+    resultado_json = procesar_json(resultado_dict)
+
+    # Guardar el resultado en un archivo JSON
+    with open("equipos_filtrados", "w", encoding="utf-8") as archivo:
+        json.dump(resultado_json, archivo, ensure_ascii=False, indent=4)
+
 
     # Crear un mapa centrado en la media de las coordenadas de los circuitos
     map_center = [
@@ -1095,16 +1202,17 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
     # Crear la leyenda HTML
     legend_html = """
     <div style="position: fixed; 
-                top: 15px; right: 10px; width: 110px; height: 160px; 
+                top: 15px; right: 10px; width: 135px; height: 170px; 
                 background-color: white; border:2px solid black; 
                 z-index:9999; font-size:12px; padding: 8px; opacity: 0.7;">
         <i style="background-color:blue; width: 15px; height: 15px; display: inline-block;"></i> Apoyos<br>
         <i style="background-color:green; width: 15px; height: 15px; display: inline-block;"></i> Trafos<br>
         <i style="background-color:purple; width: 15px; height: 15px; display: inline-block;"></i> Switches<br>
         <i style="background-color:black; width: 15px; height: 15px; display: inline-block;"></i> Red MT<br>
-        <i style="background-color:yellow; width: 15px; height: 15px; display: inline-block;"></i> CR baja<br>
-        <i style="background-color:orange; width: 15px; height: 15px; display: inline-block;"></i> CR media<br>
-        <i style="background-color:red; width: 15px; height: 15px; display: inline-block;"></i> CR alta<br>
+        <i style="background-color:green; width: 15px; height: 15px; display: inline-block;"></i> CR baja<br>
+        <i style="background-color:yellow; width: 15px; height: 15px; display: inline-block;"></i> CR media<br>
+        <i style="background-color:orange; width: 15px; height: 15px; display: inline-block;"></i> CR alta<br>
+        <i style="background-color:red; width: 15px; height: 15px; display: inline-block;"></i> CR muy alta<br>
     </div>
     """
 
@@ -1120,10 +1228,12 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
         # Dibuja el polígono en el mapa
         match df_2['NIVEL_C'].values[0]:
             case 0:
-                color = 'yellow'
+                color = 'green'
             case 1:
+                color = 'yellow'
+            case 2:
                 color = 'orange'
-            case _:
+            case 3:
                 color = 'red'
         if len(polygon_puntos) != 1:
             folium.Polygon(locations=polygon_puntos, color=color, fill=True, fill_opacity=0.3, weight=0).add_to(mapa)
@@ -1243,7 +1353,7 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
     mapa_html = mapa._repr_html_()
 
     for idx, sample_idx in enumerate(top_3_indices):
-    
+
         # Determinar el tipo de equipo según el índice
         if sample_idx >= a4_start:
             tipo_equipo = 'apoyo'

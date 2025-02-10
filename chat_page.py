@@ -177,9 +177,9 @@ UPLOAD_DIRECTORY = "Unstructured_Files"
 if not os.path.exists(UPLOAD_DIRECTORY):
     os.makedirs(UPLOAD_DIRECTORY)
 
-if maps_page.criticidad_data is not None:
+'''if maps_page.criticidad_data is not None:
     
-    get_recommendations(maps_page.criticidad_data)
+    get_recommendations(maps_page.criticidad_data)'''
     
 # Ruta para servir archivos desde 'Unstructured_Files'
 @app.server.route('/Unstructured_Files/<path:filename>')
@@ -205,6 +205,8 @@ def serve_plot_file(filename):
     prevent_initial_call=True
 )
 def manejar_chat(n_clicks_nuevo, n_clicks_enviar, n_submit, n_clicks_chat, mensaje_usuario, data, modelo_seleccionado, proceso_seleccionado):
+    
+
     ctx = callback_context
 
     if not ctx.triggered:
@@ -218,50 +220,63 @@ def manejar_chat(n_clicks_nuevo, n_clicks_enviar, n_submit, n_clicks_chat, mensa
     nueva_data = data.copy()
     nuevo_valor_entrada = ''
 
-    if prop_id == 'nuevo-chat':
-        if n_clicks_nuevo:
-            new_chat_id = f'chat-{len(data["chats"])}'
-            print("NEW CHAT ID",new_chat_id)
-            nueva_data['chats'][new_chat_id] = {'nombre': None, 'mensajes': [], 'files': []}
-            nueva_data['current_chat_id'] = new_chat_id
-            # Guardar las conversaciones actualizadas
-            save_conversations(nueva_data)
+    if prop_id == 'nuevo-chat' and n_clicks_nuevo:
+        new_chat_id = f'chat-{len(data["chats"])}'
+        print("NEW CHAT ID", new_chat_id)
+        nueva_data['chats'][new_chat_id] = {'nombre': None, 'mensajes': [], 'files': []}
+        nueva_data['current_chat_id'] = new_chat_id
 
-    elif prop_id == 'enviar-btn' or (prop_id == 'entrada-usuario' and prop_sub_id == 'n_submit'):
-        if nueva_data.get('current_chat_id') and mensaje_usuario:
-            chat_id = nueva_data['current_chat_id']
-            # Agregar mensaje del usuario y marcar que necesita respuesta
+        # Guardar solo si realmente se creó un nuevo chat
+        print("#" * 20, "\n", "GUARDADO 1", "\n", "#" * 20)
+        save_conversations(nueva_data)
+
+    elif prop_id in ['enviar-btn', 'entrada-usuario'] and (prop_sub_id == 'n_submit' or n_clicks_enviar):
+        chat_id = nueva_data.get('current_chat_id')
+        if chat_id and mensaje_usuario:
             mensaje_user = {
                 'autor': 'Tú',
                 'texto': mensaje_usuario,
                 'needs_response': True,
-                'modelo': modelo_seleccionado,      # Guardar el modelo seleccionado
-                'proceso': proceso_seleccionado     # Guardar el proceso seleccionado
+                'modelo': modelo_seleccionado,
+                'proceso': proceso_seleccionado
             }
             nueva_data['chats'][chat_id]['mensajes'].append(mensaje_user)
 
-            # Si es el primer mensaje del usuario, asignar el nombre del chat
             if nueva_data['chats'][chat_id]['nombre'] is None:
                 words = mensaje_usuario.split()
                 topic = ' '.join(words[:5]) if len(words) >= 5 else mensaje_usuario
-                nueva_data['chats'][chat_id]['nombre'] =  chat_id  # Puedes personalizar el nombre según tu lógica
+                nueva_data['chats'][chat_id]['nombre'] = chat_id  # Personaliza si lo deseas
 
             nuevo_valor_entrada = ''
 
-            # Guardar las conversaciones actualizadas
+            print("#" * 20, "\n", "GUARDADO 2", "\n", "#" * 20)
             save_conversations(nueva_data)
 
-    else:
-        # Manejar los botones de chat
+    elif prop_id.startswith("{") and prop_id.endswith("}"):
         try:
             button_id = json.loads(prop_id)
             if button_id['type'] == 'chat-boton':
-                nueva_data['current_chat_id'] = button_id['index']
-                # Guardar las conversaciones actualizadas
-                save_conversations(nueva_data)
-        except json.JSONDecodeError:
-            pass  # Manejar IDs no JSON si es necesario
+                chat_id = button_id['index']
 
+                # Solo actualizar si `current_chat_id` realmente cambia
+                if nueva_data.get('current_chat_id') != chat_id:
+                    nueva_data['current_chat_id'] = chat_id
+                    print("#" * 20, "\n", "GUARDADO 3", "\n", "#" * 20)
+                    save_conversations(nueva_data)
+
+        except json.JSONDecodeError:
+            pass  # Evitar errores en IDs no JSON
+    with open('./options/count_chat.json', 'r') as archivo_json:
+        numero = json.load(archivo_json)
+    
+    if int(numero) == 1:
+
+        nueva_data = load_previous_conversations()
+        numero = 0 
+        with open('./options/count_chat.json', 'w') as archivo_json:
+            json.dump(numero, archivo_json)
+
+    
     return nueva_data, nuevo_valor_entrada
 
 @app.callback(
@@ -397,6 +412,7 @@ def generar_respuesta_asistente(data):
         # Marcar que el mensaje del usuario ya tiene respuesta
         last_message['needs_response'] = False
         # Guardar las conversaciones actualizadas
+        print("#"*20,"\n","GUARDADO 4","\n","#"*20)
         save_conversations(data)
         return data
     else:
@@ -544,6 +560,7 @@ def handle_file_upload(contents, filename, proceso_seleccionado):
                 'filepath': f"Unstructured_Files/{unique_filename}",  # Ruta relativa para el enlace
                 'proceso': proceso_seleccionado
             })
+            print("#"*20,"\n","GUARDADO 5","\n","#"*20)
             save_conversations(data)
 
         return dbc.Alert(
