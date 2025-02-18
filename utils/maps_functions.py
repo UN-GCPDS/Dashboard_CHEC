@@ -170,7 +170,7 @@ def procesar_json(entrada_json):
         else:
             # Si el tipo de equipo no tiene reglas, se guarda sin cambios
             resultado[codigo] = datos
-
+    print(resultado)
     return resultado
 
 def graficar_grafo_interactivo_2(Z, nombres_columnas, num=0, height=400, width=70, iteraciones=20, vector=None):
@@ -961,7 +961,7 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
        # Crear la leyenda HTML
         legend_html = """
         <div style="position: fixed; 
-                    top: 15px; right: 10px; width: 135px; height: 170px; 
+                    top: 15px; right: 10px; width: 135px; height: 175px; 
                 background-color: white; border:2px solid black; 
                 z-index:9999; font-size:12px; padding: 8px; opacity: 0.7;">
         <i style="background-color:blue; width: 15px; height: 15px; display: inline-block;"></i> Apoyos<br>
@@ -1076,12 +1076,12 @@ def map_folium(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, 
         return mapa_html
 
 
-def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, redmt_seleccionado, super_eventos_seleccionado, ind, df, df1, label_encoders, scolumns, NUMERIC_COLUMNS, max_values, loaded_clf):
+def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado, redmt_seleccionado, trafos, apoyos, switches, redmt, super_eventos_seleccionado, ind, df, df1, label_encoders, scolumns, NUMERIC_COLUMNS, max_values, loaded_clf):
 
-    a1,a1_df = process_dataframe(trafos_seleccionado, df, label_encoders, df1, ind=ind,tip=2,s=1,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
-    a2,a2_df = process_dataframe(switches_seleccionado, df, label_encoders, df1, ind=ind,tip=0,s=1,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
-    a3,a3_df = process_dataframe(redmt_seleccionado, df, label_encoders, df1, ind=ind,tip=1,s=0,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
-    a4,a4_df = process_dataframe(apoyos_seleccionado, df, label_encoders, df1, ind=ind,tip=2,s=1,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
+    a1,a1_df = process_dataframe(trafos, df, label_encoders, df1, ind=ind,tip=2,s=1,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
+    a2,a2_df = process_dataframe(switches, df, label_encoders, df1, ind=ind,tip=0,s=1,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
+    a3,a3_df = process_dataframe(redmt, df, label_encoders, df1, ind=ind,tip=1,s=0,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
+    a4,a4_df = process_dataframe(apoyos, df, label_encoders, df1, ind=ind,tip=2,s=1,scolumns=scolumns, NUMERIC_COLUMNS=NUMERIC_COLUMNS, max_values=max_values)
     columns=df.columns
     arrays_to_concatenate = [arr for arr in (a1, a2, a3, a4) if arr.size > 0]
     a = np.concatenate(arrays_to_concatenate, axis=0)
@@ -1127,19 +1127,20 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
 
             # Filtrar variables que pertenecen al tipo de equipo actual
         if tipo_equipo=='apoyo':
-            allowed_columns = set(df.columns).difference(set(trafos_seleccionado.columns)).difference(set(switches_seleccionado.columns)).difference(set(redmt_seleccionado.columns))
+            allowed_columns = set(df.columns).difference(set(trafos.columns)).difference(set(switches.columns)).difference(set(redmt.columns))
         elif tipo_equipo=='interruptor':
-            allowed_columns = set(df.columns).difference(set(trafos_seleccionado.columns)).difference(set(redmt_seleccionado.columns)).difference(set(apoyos_seleccionado.columns))
+            allowed_columns = set(df.columns).difference(set(trafos.columns)).difference(set(redmt.columns)).difference(set(apoyos.columns))
         elif tipo_equipo=='tramo de linea':
-            allowed_columns = set(df.columns).difference(set(trafos_seleccionado.columns)).difference(set(switches_seleccionado.columns)).difference(set(apoyos_seleccionado.columns))
+            allowed_columns = set(df.columns).difference(set(trafos.columns)).difference(set(switches.columns)).difference(set(apoyos.columns))
         elif tipo_equipo=='transformador':
-            allowed_columns = set(df.columns).difference(set(switches_seleccionado.columns)).difference(set(redmt_seleccionado.columns)).difference(set(apoyos_seleccionado.columns))
+            allowed_columns = set(df.columns).difference(set(switches.columns)).difference(set(redmt.columns)).difference(set(apoyos.columns))
+
         be=filtered_variables = {k: v for k, v in temp_variables.items() if k in allowed_columns}
 
         # Eliminar solo las claves cuyos valores sean NaN, None o cadenas vacías
         filtered_variables = {
-        k: v for k, v in filtered_variables.items()
-        if not math.isnan(v)
+            k: v for k, v in filtered_variables.items()
+            if v not in [None, ""] and not (isinstance(v, float) and math.isnan(v))
         }
 
         #filtered_variables = {k: v for k, v in filtered_variables.items() if isinstance(v, (int, float)) and not math.isnan(v)}
@@ -1168,8 +1169,6 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
             "Tipo_de_equipo": info["tipo_equipo"],
             "top_5": {clave: str(valor) for clave, valor in info["top_5_variables"].items()}  # Convertir valores a string
         }
-
-
     # Procesar el JSON
     resultado_json = procesar_json(resultado_dict)
 
@@ -1202,7 +1201,7 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
     # Crear la leyenda HTML
     legend_html = """
     <div style="position: fixed; 
-                top: 15px; right: 10px; width: 135px; height: 170px; 
+                top: 15px; right: 10px; width: 135px; height: 175px; 
                 background-color: white; border:2px solid black; 
                 z-index:9999; font-size:12px; padding: 8px; opacity: 0.7;">
         <i style="background-color:blue; width: 15px; height: 15px; display: inline-block;"></i> Apoyos<br>

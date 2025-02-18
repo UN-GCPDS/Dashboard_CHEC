@@ -433,6 +433,7 @@ def update_maps_and_slider(decrease_clicks, increase_clicks, slider_value, equip
         if (equipos_clicks > click_count_1) and (condition == 'CRITICIDAD') and (evento_id is not None and evento_id != ''):
             click_count_1 = equipos_clicks
             map = map_folium_2(data_frame[0], data_frame[1], data_frame[2], data_frame[3],
+                total_data[0], total_data[1], total_data[2],total_data[3],               
                 data_frame[4][day-1], dict_options[evento_id], total_data[7], total_data[8], 
                 total_data[9], total_data[10], total_data[11],total_data[12],total_data[13])
             return dash.no_update, map, dash.no_update
@@ -488,9 +489,9 @@ def handle_url_update(select_evento_clicks, n_clicks_chat, n_clicks_graphs, n_cl
     if triggered_id == 'recomendacion-button' and select_evento_clicks:
         if (select_evento_clicks != evento_id) and (select_evento_clicks != None):
             evento_id = select_evento_clicks
-            with open("equipos_filtrados.json", "r", encoding="utf-8") as archivo:
-                datos_cargados = json.load(archivo)
-            get_recommendations(datos_cargados)
+            with open("./equipos_filtrados", "r", encoding="utf-8") as archivo:
+                resultado_json = json.load(archivo)
+            get_recommendations(resultado_json)
             return "/chat_page"  # Cambia esto al pathname correspondiente
         
 

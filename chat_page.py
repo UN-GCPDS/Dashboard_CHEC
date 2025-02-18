@@ -227,7 +227,6 @@ def manejar_chat(n_clicks_nuevo, n_clicks_enviar, n_submit, n_clicks_chat, mensa
         nueva_data['current_chat_id'] = new_chat_id
 
         # Guardar solo si realmente se creó un nuevo chat
-        print("#" * 20, "\n", "GUARDADO 1", "\n", "#" * 20)
         save_conversations(nueva_data)
 
     elif prop_id in ['enviar-btn', 'entrada-usuario'] and (prop_sub_id == 'n_submit' or n_clicks_enviar):
@@ -249,7 +248,6 @@ def manejar_chat(n_clicks_nuevo, n_clicks_enviar, n_submit, n_clicks_chat, mensa
 
             nuevo_valor_entrada = ''
 
-            print("#" * 20, "\n", "GUARDADO 2", "\n", "#" * 20)
             save_conversations(nueva_data)
 
     elif prop_id.startswith("{") and prop_id.endswith("}"):
@@ -261,7 +259,6 @@ def manejar_chat(n_clicks_nuevo, n_clicks_enviar, n_submit, n_clicks_chat, mensa
                 # Solo actualizar si `current_chat_id` realmente cambia
                 if nueva_data.get('current_chat_id') != chat_id:
                     nueva_data['current_chat_id'] = chat_id
-                    print("#" * 20, "\n", "GUARDADO 3", "\n", "#" * 20)
                     save_conversations(nueva_data)
 
         except json.JSONDecodeError:
