@@ -117,7 +117,7 @@ reglas_equipo = {
             "MATERIAL", "LONG_APOYO", "TIERRA_PIE", "VIENTO",
             "ÍNDICE_RAYOS", "PRECIPITACIÓN", "RADIACIÓN_UV", "TEMPERATURA"
         },
-        "keywords": {"temp", "solar_rad", "uv", "wind_gust_spd", "wind_spd"}
+        "keywords": {"temp", "solar_rad", "uv", "wind_gust_spd", "wind_spd", "ALTITUD", "CORRIENTE", "TIPO_1", "TIPO_2"}
     },
     "switch": {
         "permitidos": {
@@ -125,7 +125,7 @@ reglas_equipo = {
             "TEMPERATURA_AMBIENTE", "PRECIPITACIÓN",
             "HUMEDAD_RELATIVA", "RAYOS"
         },
-        "keywords": {"rh", "temp", "wind_gust_spd", "wind_spd"}
+        "keywords": {"rh", "temp", "wind_gust_spd", "wind_spd", "ALTITUD", "CORRIENTE", "TIPO_1", "TIPO_2"}
     },
     "tramo_red": {
         "permitidos": {
@@ -133,14 +133,14 @@ reglas_equipo = {
             "GUARDACONDUCTOR", "VELOCIDAD_VIENTO", "TEMPERATURA",
             "HUMEDAD_RELATIVA", "PRECIPITACIÓN"
         },
-        "keywords": {"wind_gust_spd", "wind_spd", "rh"}
+        "keywords": {"wind_gust_spd", "wind_spd", "rh", "ALTITUD", "CORRIENTE", "TIPO_1", "TIPO_2"}
     },
     "transformador": {
         "permitidos": {
             "KVA", "KV1", "IMPEDANCE", "Temperatura",
             "Humedad", "Aceite Aislante"
         },
-        "keywords": {"temp", "rh"}
+        "keywords": {"temp", "rh", "ALTITUD", "CORRIENTE", "TIPO_1", "TIPO_2"}
     }
 }
 
