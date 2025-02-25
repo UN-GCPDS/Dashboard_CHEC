@@ -265,11 +265,12 @@ def select_subcriteria_1(selection_sub_criteria_1):
                                 return div
 
                         case _:
-                        
+                                selection_criteria[0][0] = ''
                                 return dash.no_update
 
         else:
-                return dash.no_update
+                selection_criteria[0][0] = ''
+                return None
 
 @app.callback(
     Input('select-subcriteria-1-1-tab-net', 'value'),
@@ -512,11 +513,12 @@ def select_subcriteria_2(selection_sub_criteria_2):
                                 return div
 
                         case _:
-                        
+                                selection_criteria[1][0] = ''
                                 return dash.no_update
 
         else:
-                return dash.no_update
+                selection_criteria[1][0] = ''
+                return None
 
 @app.callback(
     Input('select-subcriteria-2-1-tab-net', 'value'),
@@ -759,11 +761,12 @@ def select_subcriteria_3(selection_sub_criteria_3):
                                 return div
 
                         case _:
-                        
+                                selection_criteria[2][0] = ''
                                 return dash.no_update
 
         else:
-                return dash.no_update
+                selection_criteria[2][0] = ''
+                return None
 
 @app.callback(
     Input('select-subcriteria-3-1-tab-net', 'value'),
@@ -1006,11 +1009,12 @@ def select_subcriteria_4(selection_sub_criteria_4):
                                 return div
 
                         case _:
-                        
+                                selection_criteria[3][0] = ''
                                 return dash.no_update
 
         else:
-                return dash.no_update
+                selection_criteria[3][0] = ''
+                return None
 
 @app.callback(
     Input('select-subcriteria-4-1-tab-net', 'value'),
@@ -1061,7 +1065,7 @@ def confirm_button_fn_tab_net(n_clicks):
         
         if count > 0:
                
-               os.remove("./outputs_PDFs/graphics_criticality_"+str(count-1)+".png")
+               os.remove("./outputs_PDFs/graphics_criticality_"+str(count-1)+".pdf")
         
         count = count + 1
 

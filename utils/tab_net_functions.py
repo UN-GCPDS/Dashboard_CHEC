@@ -269,7 +269,11 @@ def graphics_PDF(criterias, data_frame_select, mask, Xdata, y, y_categorized, SA
 
     for i in range(0,4):
         
-        if (criterias[i][0] != '') and (criterias[i][1] != ''):
+        if criterias[i][0] != '' and criterias[i][0] != None:
+
+            if criterias[i][1] == '':
+
+                continue
 
             match criterias[i][0]:
 

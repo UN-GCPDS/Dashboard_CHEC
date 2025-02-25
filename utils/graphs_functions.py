@@ -52,7 +52,7 @@ def graph_probabilty(criterias, data_total, probability_text, count):
 
             for i in range(1,5):
                 
-                if criterias[i][0] != '':
+                if criterias[i][0] != '' and criterias[i][0] != None:
 
                     if criterias[i][1] == '':
                             
