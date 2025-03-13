@@ -1,16 +1,29 @@
 {
-    "MAZ23X15X": {
-        "Tipo_de_equipo": "transformador",
+    "E31600": {
+        "Tipo_de_equipo": "apoyo",
         "top_5": {
-            "h6-rh": "88.0",
-            "h5-temp": "12.2"
+            "h13-solar_rad": "740.0",
+            "CORRIENTE_mean": "nan",
+            "h14-temp": "23.7",
+            "h7-wind_gust_spd": "6.4"
         }
     },
-    "E31517": {
+    "68653": {
+        "Tipo_de_equipo": "apoyo",
+        "top_5": {
+            "h13-solar_rad": "740.0",
+            "CORRIENTE_mean": "nan",
+            "h14-temp": "23.7",
+            "h7-wind_gust_spd": "6.4"
+        }
+    },
+    "E31512": {
         "Tipo_de_equipo": "transformador",
         "top_5": {
-            "h6-rh": "88.0",
-            "h5-temp": "12.2"
+            "h14-temp": "23.7",
+            "h22-rh": "76.0",
+            "h6-rh": "84.0",
+            "CORRIENTE_mean": "nan"
         }
     }
 }

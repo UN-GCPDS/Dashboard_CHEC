@@ -28,12 +28,17 @@ from langchain_openai import OpenAI
 import time
 import shutil 
 from pyvis.network import Network
+import httpx
+
 
 import maps_page
 
 from functions.procces import eventos_transformadores_procces,eventos_transformadores_plots_procces
 from functions.tools import capitulo_1, capitulo_2, capitulo_3, capitulo_4, resolucion_40117,eventos_transformadores, eventos_transformadores_plots, normativa_apoyos, normativa_protecciones, normativa_aisladores, redes_aereas_media_tension, codigo_electrico_colombiano, requisitos_redes_aereas, retie
 
+
+http_client = httpx.Client(verify=False)
+http_async_client = httpx.AsyncClient(verify=False)
 
 def update_documents_procces(name_procces,path_uploaded_pdf):
     path_vectorial_database=f"embeddings_by_procces/{name_procces}"
@@ -149,7 +154,7 @@ def conversation(chat_id,query,model,procces):
             elif model=="llama3.2":
                 chain = load_qa_chain(ChatOllama(model="llama3.2:1b",temperature=0), chain_type="stuff", memory=memory, prompt=prompt)
             elif model=="gpt":
-                chain = load_qa_chain(ChatOpenAI(model_name="gpt-3.5-turbo",temperature=0), chain_type="stuff", memory=memory, prompt=prompt)
+                chain = load_qa_chain(ChatOpenAI(model_name="gpt-3.5-turbo",temperature=0, http_client=http_async_client), chain_type="stuff", memory=memory, prompt=prompt)
             
             # Load the chat history of the conversation for every particular agent
             path_memory=f"memories/{chat_id}.pkl"
@@ -208,7 +213,7 @@ def conversation(chat_id,query,model,procces):
         #     llm_agent=ChatOllama(model="llama3.1",temperature=0)
         # elif model=="llama3.2":
         #     llm_agent=ChatOllama(model="llama3.2:1b",temperature=0)
-        llm_agent=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+        llm_agent=ChatOpenAI(temperature=0, model="gpt-3.5-turbo", http_client=http_client)
         # Prompt to use in the LangChain Agent:
         prompt = hub.pull("hwchase17/openai-functions-agent")
         prompt.messages[0].prompt.template="""Eres un asistente de servicio al cliente artificial que tiene una conversación con un asistente de servicio al cliente humano y tu función es responder 
@@ -318,10 +323,14 @@ def get_structure_graph_recomendation(info_poligono):
                         var = variable_modificada
                 else:
                     var = variable_modificada
-            try:
-                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==var]["Documento "].iloc[0]
-            except:
-                documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==var]["Documento"].iloc[0]
+            print(variables_recomendacion[variables_recomendacion["Variables"]==var])
+            if not variables_recomendacion[variables_recomendacion["Variables"]==var].empty:
+                try:
+                    documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==var]["Documento "].iloc[0]
+                except:
+                    documento_buscar=variables_recomendacion[variables_recomendacion["Variables"]==var]["Documento"].iloc[0]
+            else:
+                continue
             sugerencia=variables_recomendacion[variables_recomendacion["Variables"]==var]["Sugerencia"].iloc[0]
             seccion_buscar=variables_recomendacion[variables_recomendacion["Variables"]==var]["Normativa"].iloc[0]
             description_var=variables_recomendacion[variables_recomendacion["Variables"]==var]["Descripción"].iloc[0]
@@ -564,10 +573,17 @@ def recomendacion(model:str, chat_id:str,info_poligono:dict,human_input='Genéra
     prompt = PromptTemplate(
         input_variables=["chat_history", "human_input", "context"], template=template
     )
-
+    
 
     if model=="gpt":
-        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+        try:
+            llm_chat = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+        except TypeError as e:
+            if "Expected an instance of `httpx.Client` but got <class 'httpx.AsyncClient'>" in str(e):
+                print("Error: Se esperaba una instancia de httpx.Client pero se proporcionó httpx.AsyncClient.")
+                llm_chat = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+            else:
+                raise e
     elif model=="llama1":
         llm_chat=ChatOllama(model="llama3.1",temperature=0)
     elif model=="llama2":
@@ -740,7 +756,7 @@ def recomendacion_apoyos(model:str, chat_id:str,data_equipo:dict,human_input='Ge
     memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
 
     if model=="gpt":
-        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo", http_client=http_client)
     elif model=="llama1":
         llm_chat=ChatOllama(model="llama3.1",temperature=0)
     elif model=="llama2":
@@ -854,7 +870,7 @@ def recomendacion_switches(model:str, chat_id:str,data_equipo:dict,human_input='
     memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
 
     if model=="gpt":
-        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo", http_client=http_client)
     elif model=="llama1":
         llm_chat=ChatOllama(model="llama3.1",temperature=0)
     elif model=="llama2":
@@ -958,7 +974,7 @@ def recomendacion_tramo_red(model:str, chat_id:str,data_equipo:dict,human_input=
     memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
 
     if model=="gpt":
-        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo", http_client=http_client)
     elif model=="llama1":
         llm_chat=ChatOllama(model="llama3.1",temperature=0)
     elif model=="llama2":
@@ -1075,7 +1091,7 @@ def recomendacion_transformadores(model:str, chat_id:str,data_equipo:dict,human_
     memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
 
     if model=="gpt":
-        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo", http_client=http_client)
     elif model=="llama1":
         llm_chat=ChatOllama(model="llama3.1",temperature=0)
     elif model=="llama2":

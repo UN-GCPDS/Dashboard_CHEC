@@ -61,7 +61,7 @@ def wait_and_open_browser():
             webbrowser.open(url)  # Si conecta, abre el navegador
             break  # Salir del bucle cuando el servidor esté listo
         except:
-            time.sleep(1)  # Espera 1 segundo antes de volver a intentar
+            time.sleep(2)  # Espera 1 segundo antes de volver a intentar
 
 if __name__ == '__main__':
     # Abrir el archivo en modo lectura
