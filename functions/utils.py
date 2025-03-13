@@ -161,7 +161,7 @@ def conversation(chat_id,query,model,procces):
             if os.path.exists(path_memory):
                 with open(path_memory, 'rb') as f:
                     memory = pickle.load(f) #memory of the conversation
-                
+            
                 chain.memory=memory
 
             embeddings = OpenAIEmbeddings(model="text-embedding-ada-002") #word2vec model of openAI
@@ -180,6 +180,7 @@ def conversation(chat_id,query,model,procces):
 
             return response, False
 
+
     elif procces == 'recomendacion':
 
         # Cargar la variable desde el archivo JSON 
@@ -194,6 +195,7 @@ def conversation(chat_id,query,model,procces):
 
             model="llama1"
 
+            a = 1
 
         response = recomendacion(model, chat_id, data_equipo, query)
             
