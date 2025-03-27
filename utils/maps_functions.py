@@ -1263,7 +1263,14 @@ def map_folium_2(trafos_seleccionado, apoyos_seleccionado, switches_seleccionado
 
     # Crear el dataframe `aporte_SAIDI`
     aporte_SAIDI = a_df[['LATITUD', 'LONGITUD']].copy()
-    aporte_SAIDI['SAIDI'] = y_e
+    if len(y_e) != len(aporte_SAIDI.index):
+        # Calcula la diferencia
+        diff = len(aporte_SAIDI.index) - len(y_e)
+        # Rellena con el valor x (puedes cambiarlo al valor que necesites)
+        y_e = np.append(y_e, [0] * diff)
+        aporte_SAIDI['SAIDI'] = y_e
+    else:   
+        aporte_SAIDI['SAIDI'] = y_e
 
     # Reemplazar valores <= 0 con un pequeño número positivo para evitar problemas en el logaritmo
     aporte_SAIDI.loc[aporte_SAIDI['SAIDI'] == 0, 'SAIDI'] = np.nan  # Convierte 0 a NaN

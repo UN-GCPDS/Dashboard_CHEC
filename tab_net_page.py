@@ -33,6 +33,8 @@ layout = create_layout()
 selection_criteria = [['','','',''],['','','',''],['','','',''],['','','','']]
 count_clicks = -1
 count = 0
+with open('count_tab_net.txt', 'w', encoding='utf-8') as file:
+    file.write(str(count))
 
 # Para la carpeta outputs_PDFs 
 @app.server.route('/outputs_PDFs/<path:filename>', endpoint='serve_pdf_outputs')
@@ -1053,21 +1055,42 @@ def confirm_button_fn_tab_net(n_clicks):
     # Verificar condiciones para la generación del texto
     if (selection_criteria[0][0] != '') | (selection_criteria[1][0] != '') | (selection_criteria[2][0] != '') | (selection_criteria[3][0] != ''):
 
+        with open('count_tab_net.txt', 'r', encoding='utf-8') as file:
+                count = file.read()
+        count = int(count)
+        if count > 0:
+               
+                # Especifica la ruta de la carpeta
+                carpeta = "./outputs_PDFs"
+
+                # Verifica si la carpeta existe
+                if os.path.exists(carpeta):
+                        # Itera por todos los archivos en la carpeta
+                        for archivo in os.listdir(carpeta):
+                                # Comprueba si el archivo tiene la extensión .png
+                                if archivo.endswith(".png"):
+                                        ruta_archivo = os.path.join(carpeta, archivo)
+                                        # Elimina el archivo
+                                        os.remove(ruta_archivo)
+                                        print(f"Eliminado: {ruta_archivo}")
+                        print("Todos los archivos .png han sido eliminados.")
 
         # Llamada a la función de generación de gráfico
         graphics_PDF(selection_criteria, data_total[6], data_total[0], data_total[5], data_total[7], data_total[8], data_total[9], count)
 
+        with open('count_tab_net.txt', 'r', encoding='utf-8') as file:
+                count = file.read()
+        count = int(count)
         # Estilo del gráfico
         graphics = html.Iframe(
                 src="/outputs_PDFs/graphics_criticality_"+str(count)+".pdf",  # Ruta relativa al archivo servido
                 style={"width": "95%", "height": "95%","position": "relative", "margin": "2% 0 0 0"},  # Ajusta las dimensiones
                 )
         
-        if count > 0:
-               
-               os.remove("./outputs_PDFs/graphics_criticality_"+str(count-1)+".pdf")
         
         count = count + 1
+        with open('count_graphs.txt', 'w', encoding='utf-8') as file:
+                file.write(str(count))
 
         return graphics
 

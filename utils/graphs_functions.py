@@ -21,7 +21,7 @@ def load_data():
 
     return eventos_interruptor, eventos_tramo_linea, eventos_transformador
 
-def graph_probabilty(criterias, data_total, probability_text, count):
+def graph_probability(criterias, data_total, probability_text, count):
 
     if count == 0:
 
@@ -107,6 +107,7 @@ def graph_probabilty(criterias, data_total, probability_text, count):
             plt.grid(True, linestyle='--', alpha=0.7)
 
             # Guardar la figura
+            print('Guardado',f"./outputs/probability_graph_{count}.png")
             plt.savefig(f"./outputs/probability_graph_{count}.png")
         
         case 'Eventos Tramo':
@@ -167,6 +168,7 @@ def graph_probabilty(criterias, data_total, probability_text, count):
             plt.grid(True, linestyle='--', alpha=0.7)
 
             # Guardar la figura
+            print('Guardado',f"./outputs/probability_graph_{count}.png")
             plt.savefig(f"./outputs/probability_graph_{count}.png")
 
         case 'Eventos Transformador':
@@ -226,6 +228,7 @@ def graph_probabilty(criterias, data_total, probability_text, count):
             plt.grid(True, linestyle='--', alpha=0.7)
 
             # Guardar la figura
+            print('Guardado',f"./outputs/probability_graph_{count}.png")
             plt.savefig(f"./outputs/probability_graph_{count}.png")
 
         case _:

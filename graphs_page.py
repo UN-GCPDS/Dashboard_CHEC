@@ -24,7 +24,7 @@ from app import app
 import json
 from flask import send_from_directory
 from ui_components.ui_graphs import create_layout
-from utils.graphs_functions import load_data, graph_probabilty
+from utils.graphs_functions import load_data, graph_probability
 
 
 layout = create_layout()
@@ -34,6 +34,8 @@ data_total = load_data()
 selection_criteria = [[''],['','','',''],['','','',''],['','','',''],['','','',''],['']]
 count_clicks = -1
 count = 0
+with open('count_graphs.txt', 'w', encoding='utf-8') as file:
+    file.write(str(count))
 
 # Para la carpeta outputs
 @app.server.route('/outputs/<path:filename>', endpoint='serve_outputs')
@@ -3194,7 +3196,26 @@ def confirm_button_fn(n_clicks):
         probability_text = probability_text + ')'
 
         # Llamada a la función de generación de gráfico
-        graph_probabilty(selection_criteria, data_total, probability_text, count)
+        with open('count_graphs.txt', 'r', encoding='utf-8') as file:
+                count = file.read()
+        count = int(count)
+        if count > 0:
+               
+                # Especifica la ruta de la carpeta
+                carpeta = "./outputs"
+
+                # Verifica si la carpeta existe
+                if os.path.exists(carpeta):
+                        # Itera por todos los archivos en la carpeta
+                        for archivo in os.listdir(carpeta):
+                                # Comprueba si el archivo tiene la extensión .png
+                                if archivo.endswith(".png"):
+                                        ruta_archivo = os.path.join(carpeta, archivo)
+                                        # Elimina el archivo
+                                        os.remove(ruta_archivo)
+                                        print(f"Eliminado: {ruta_archivo}")
+                        print("Todos los archivos .png han sido eliminados.")
+        graph_probability(selection_criteria, data_total, probability_text, count)
 
         # Estilo del gráfico
         graph = (html.Img(src="/outputs/probability_graph_"+str(count)+".png",style={
@@ -3223,11 +3244,10 @@ def confirm_button_fn(n_clicks):
                 )
         
         
-        if count > 0:
-               
-               os.remove("./outputs/probability_graph_"+str(count-1)+".png")
         
         count = count + 1
+        with open('count_graphs.txt', 'w', encoding='utf-8') as file:
+                file.write(str(count))
 
         return probability_text, graph
 
@@ -3241,6 +3261,9 @@ def confirm_button_fn(n_clicks):
 )
 def download_file(n_clicks):
     # Generar el archivo para descarga
+    with open('count_graphs.txt', 'r', encoding='utf-8') as file:
+        count = file.read()
+    count = int(count)
     return dcc.send_file("./outputs/probability_graph_"+str(count-1)+".png")
 
 @app.callback(

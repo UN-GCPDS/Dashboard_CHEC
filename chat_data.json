@@ -13,6 +13,64 @@
                 {
                     "autor": "Asistente",
                     "texto": "Hola, soy un asistente para ayudarte con tus consultas. ¿En qué puedo ayudarte hoy?"
+                },
+                {
+                    "autor": "Tú",
+                    "texto": "Genérame un gráfico de los municipios con más interrupciones en el 2022",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "generate_plots"
+                },
+                {
+                    "autor": "Asistente",
+                    "imagen": "plots/chat-0/output_0.jpg",
+                    "texto": "¿Hay algo más en lo que te pueda ayudar?"
+                },
+                {
+                    "autor": "Tú",
+                    "texto": "Genérame un gráfico de los cuatro municipios con más interrupciones en el 2020",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "generate_plots"
+                },
+                {
+                    "autor": "Asistente",
+                    "imagen": "plots/chat-0/output_1.jpg",
+                    "texto": "¿Hay algo más en lo que te pueda ayudar?"
+                },
+                {
+                    "autor": "Tú",
+                    "texto": "¿Qué me puedes decir del capítulo 3 del RETIE?",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "retie"
+                },
+                {
+                    "autor": "Asistente",
+                    "texto": "Según el texto proporcionado, el Capítulo 3 del RETIE se enfoca en las instalaciones objeto del reglamento. Incluye aspectos como los requerimientos generales de las instalaciones eléctricas, las competencias y responsabilidades de las personas que intervienen en dichas instalaciones, el diseño de las mismas, los espacios para montaje de equipos y distancias mínimas de seguridad, el código de colores para conductores de uso eléctrico, la operación y mantenimiento de las instalaciones eléctricas, el cumplimiento de normatividad ambiental, la protección de las instalaciones eléctricas, la clasificación de los niveles de tensión, las distancias de seguridad, los campos electromagnéticos, el sistema de puesta a tierra, la protección contra rayos y sobretensiones transitorias, entre otros aspectos relacionados con las instalaciones eléctricas."
+                },
+                {
+                    "autor": "Tú",
+                    "texto": "Dime qué es la norma ISO 9223",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "general"
+                },
+                {
+                    "autor": "Asistente",
+                    "texto": "La norma ISO 9223 se refiere a la clasificación de corrosividad atmosférica. Esta norma establece diferentes categorías para clasificar el grado de corrosión que puede experimentar un material metálico expuesto a la atmósfera. La clasificación se basa en factores como la humedad, la temperatura y la presencia de contaminantes en el aire. La norma ISO 9223 es importante para determinar el tipo de protección anticorrosiva adecuada a utilizar en estructuras metálicas expuestas a diferentes condiciones ambientales."
+                },
+                {
+                    "autor": "Tú",
+                    "texto": "Genérame un gráfico de los cuatro municipios con más interrupciones en el 2021",
+                    "needs_response": false,
+                    "modelo": "gpt",
+                    "proceso": "general"
+                },
+                {
+                    "autor": "Asistente",
+                    "imagen": "plots/chat-0/output_2.jpg",
+                    "texto": "¿Hay algo más en lo que te pueda ayudar?"
                 }
             ],
             "files": []

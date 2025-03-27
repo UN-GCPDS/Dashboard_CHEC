@@ -21,7 +21,6 @@ from langchain_core.documents.base import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter #To splitt the text
 
 import pandas as pd 
-from langchain_community.chat_models import ChatOpenAI
 from langchain.agents.agent_types import AgentType
 from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
 from langchain_openai import OpenAI
@@ -154,7 +153,28 @@ def conversation(chat_id,query,model,procces):
             elif model=="llama3.2":
                 chain = load_qa_chain(ChatOllama(model="llama3.2:1b",temperature=0), chain_type="stuff", memory=memory, prompt=prompt)
             elif model=="gpt":
-                chain = load_qa_chain(ChatOpenAI(model_name="gpt-3.5-turbo",temperature=0, http_client=http_async_client), chain_type="stuff", memory=memory, prompt=prompt)
+                try:
+                    # Primero intenta con el cliente asíncrono
+                    chain = load_qa_chain(
+                        ChatOpenAI(
+                            model_name="gpt-3.5-turbo", 
+                            temperature=0
+                        ), 
+                        chain_type="stuff", 
+                        memory=memory, 
+                        prompt=prompt
+                    )
+                except TypeError:
+                    # Si falla, intenta con el cliente síncrono
+                    chain = load_qa_chain(
+                        ChatOpenAI(
+                            model_name="gpt-3.5-turbo", 
+                            temperature=0
+                        ), 
+                        chain_type="stuff", 
+                        memory=memory, 
+                        prompt=prompt
+                    )
             
             # Load the chat history of the conversation for every particular agent
             path_memory=f"memories/{chat_id}.pkl"
@@ -215,7 +235,10 @@ def conversation(chat_id,query,model,procces):
         #     llm_agent=ChatOllama(model="llama3.1",temperature=0)
         # elif model=="llama3.2":
         #     llm_agent=ChatOllama(model="llama3.2:1b",temperature=0)
-        llm_agent=ChatOpenAI(temperature=0, model="gpt-3.5-turbo", http_client=http_client)
+        try:
+            llm_agent=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+        except:
+            llm_agent=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
         # Prompt to use in the LangChain Agent:
         prompt = hub.pull("hwchase17/openai-functions-agent")
         prompt.messages[0].prompt.template="""Eres un asistente de servicio al cliente artificial que tiene una conversación con un asistente de servicio al cliente humano y tu función es responder 
@@ -758,7 +781,7 @@ def recomendacion_apoyos(model:str, chat_id:str,data_equipo:dict,human_input='Ge
     memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
 
     if model=="gpt":
-        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo", http_client=http_client)
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
     elif model=="llama1":
         llm_chat=ChatOllama(model="llama3.1",temperature=0)
     elif model=="llama2":
@@ -872,7 +895,7 @@ def recomendacion_switches(model:str, chat_id:str,data_equipo:dict,human_input='
     memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
 
     if model=="gpt":
-        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo", http_client=http_client)
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
     elif model=="llama1":
         llm_chat=ChatOllama(model="llama3.1",temperature=0)
     elif model=="llama2":
@@ -976,7 +999,7 @@ def recomendacion_tramo_red(model:str, chat_id:str,data_equipo:dict,human_input=
     memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
 
     if model=="gpt":
-        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo", http_client=http_client)
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
     elif model=="llama1":
         llm_chat=ChatOllama(model="llama3.1",temperature=0)
     elif model=="llama2":
@@ -1093,7 +1116,7 @@ def recomendacion_transformadores(model:str, chat_id:str,data_equipo:dict,human_
     memory = ConversationBufferMemory(memory_key="chat_history", input_key="human_input")
 
     if model=="gpt":
-        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo", http_client=http_client)
+        llm_chat=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
     elif model=="llama1":
         llm_chat=ChatOllama(model="llama3.1",temperature=0)
     elif model=="llama2":
